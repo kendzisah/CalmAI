@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, Platform } from 'react-native';
+import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 import {
   useFonts,
   Inter_400Regular,
@@ -15,12 +16,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StyleSheet } from 'react-native';
 import { processSyncQueue } from '@/services/syncService';
+import { useAuth } from '@/hooks/useAuth';
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
+  // Initialize auth state globally so it's always available
+  useAuth();
+
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Medium': Inter_500Medium,
@@ -33,6 +38,13 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
+
+  // RevenueCat initialization
+  useEffect(() => {
+    Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
+    const apiKey = 'test_QkdrENKZChNNxBKircPTViSAijI';
+    Purchases.configure({ apiKey });
+  }, []);
 
   // Sync queue processing on app foreground
   useEffect(() => {

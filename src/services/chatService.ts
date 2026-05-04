@@ -1,8 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import { useChatStore } from '@/stores/chatStore';
-import type { SSEEvent } from '@/types/chat';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export async function sendChatMessage(
   sessionId: string,
@@ -25,6 +25,7 @@ export async function sendChatMessage(
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -34,60 +35,23 @@ export async function sendChatMessage(
       }),
     });
 
+    store.setStreaming(false);
+
     if (response.status === 402) {
-      store.setStreaming(false);
       throw new Error('PAYWALL');
     }
 
     if (!response.ok) {
-      store.setStreaming(false);
       throw new Error(`Chat API error: ${response.status}`);
     }
 
-    const contentType = response.headers.get('content-type') || '';
+    const data = await response.json();
 
-    if (contentType.includes('text/event-stream')) {
-      // SSE streaming response
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No response body');
-
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter((line) => line.startsWith('data: '));
-
-        for (const line of lines) {
-          try {
-            const event: SSEEvent = JSON.parse(line.replace('data: ', ''));
-
-            if (event.type === 'token') {
-              store.appendStreamToken(event.data);
-            } else if (event.type === 'done') {
-              await store.finalizeStream();
-              // Fetch smart replies
-              fetchSmartReplies(event.data);
-            } else if (event.type === 'crisis') {
-              store.setStreaming(false);
-              await store.addAssistantMessage(event.data);
-            } else if (event.type === 'error') {
-              store.setStreaming(false);
-            }
-          } catch {
-            // Skip malformed SSE lines
-          }
-        }
-      }
-    } else {
-      // JSON response (crisis or fallback)
-      const data = await response.json();
-      store.setStreaming(false);
-      if (data.content) {
-        await store.addAssistantMessage(data.content);
-      }
+    if (data.type === 'crisis') {
+      await store.addAssistantMessage(data.content);
+    } else if (data.content) {
+      await store.addAssistantMessage(data.content);
+      fetchSmartReplies(data.content);
     }
   } catch (err) {
     store.setStreaming(false);
@@ -104,6 +68,7 @@ async function fetchSmartReplies(lastAssistantMessage: string) {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ lastAssistantMessage }),
@@ -127,6 +92,7 @@ export async function fetchJournalPrompt(mood?: string): Promise<string> {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ mood }),

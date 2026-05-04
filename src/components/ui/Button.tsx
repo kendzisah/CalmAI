@@ -1,9 +1,5 @@
-import { Pressable, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import { useRef } from 'react';
+import { Pressable, StyleSheet, ViewStyle, TextStyle, Animated } from 'react-native';
 import { Colors, Radius, Spacing, Typography } from '@/lib/constants';
 import { Text } from './Text';
 
@@ -17,44 +13,39 @@ interface Props {
   style?: ViewStyle;
 }
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
 export function Button({ title, onPress, variant = 'primary', disabled = false, style }: Props) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
+    Animated.spring(scale, { toValue: 0.95, useNativeDriver: true }).start();
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
   };
 
   return (
-    <AnimatedPressable
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      disabled={disabled}
-      style={[
-        styles.base,
-        variantContainerStyles[variant],
-        disabled && styles.disabled,
-        animatedStyle,
-        style,
-      ]}
-    >
-      <Text
-        variant="bodyMedium"
-        style={[styles.text, variantTextStyles[variant]]}
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={disabled}
+        style={[
+          styles.base,
+          variantContainerStyles[variant],
+          disabled && styles.disabled,
+          style,
+        ]}
       >
-        {title}
-      </Text>
-    </AnimatedPressable>
+        <Text
+          variant="bodyMedium"
+          style={[styles.text, variantTextStyles[variant]]}
+        >
+          {title}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 

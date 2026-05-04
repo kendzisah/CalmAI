@@ -4,17 +4,24 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Text, Chip } from '@/components/ui';
+import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { Colors, Spacing, Radius } from '@/lib/constants';
 import { useChatStore } from '@/stores/chatStore';
 import { usePaywall } from '@/hooks/usePaywall';
 import { detectCrisis, CRISIS_MESSAGE, CRISIS_PHONE } from '@/utils/crisisDetection';
+import { sendChatMessage } from '@/services/chatService';
+import { useOnboardingStore } from '@/stores/onboardingStore';
+import { useAuthStore } from '@/stores/authStore';
 import type { ChatMessage } from '@/types/chat';
 
-const DEFAULT_CHIPS = ["I'm anxious", "I need to vent", "Help me calm down", "Just talk"];
+const DEFAULT_CHIPS = ["I'm feeling anxious", "I need to vent", "Help me regulate", "Just talk"];
 
 export default function ChatScreen() {
   const { messages, currentSession, isStreaming, streamingContent, quickReplies, startSession, addUserMessage, addAssistantMessage, setQuickReplies } = useChatStore();
   const { guardChat } = usePaywall();
+  const { selectedMood, selectedContext, reliefTag } = useOnboardingStore();
+  const { isAuthenticated, isAnonymous } = useAuthStore();
+  const needsAccount = !isAuthenticated || isAnonymous;
   const [inputText, setInputText] = useState('');
   const [showCrisisBanner, setShowCrisisBanner] = useState(false);
   const flatListRef = useRef<FlatList>(null);
@@ -42,22 +49,50 @@ export default function ChatScreen() {
     setInputText('');
     await addUserMessage(messageText);
 
-    // TODO: Phase 4 — call chat-completion Edge Function for AI response
-    // For now, add a placeholder response
-    setTimeout(async () => {
-      await addAssistantMessage("I hear you. Let's work through this together. Can you tell me more about what's on your mind?");
-      setQuickReplies(["Tell me more", "Try breathing", "I'm not sure"]);
-    }, 1500);
-  }, [inputText, guardChat, addUserMessage, addAssistantMessage, setQuickReplies]);
+    try {
+      const isFirst = messages.length <= 1;
+      await sendChatMessage(currentSession!, messageText, {
+        isFirstConversation: isFirst,
+        onboardingMood: selectedMood || undefined,
+        onboardingContext: selectedContext || undefined,
+        reliefTag: reliefTag || undefined,
+      });
+    } catch (err: any) {
+      if (err?.message === 'PAYWALL') {
+        router.push('/paywall');
+      } else if (err?.message === 'Not authenticated') {
+        // Fallback for unauthenticated users — provide a local response
+        await addAssistantMessage("Hey, I'd love to keep chatting but I need you to create an account so I can remember our convos. It only takes a sec.");
+        setQuickReplies(["Let's do it", "Maybe later"]);
+      } else {
+        await addAssistantMessage("Ugh, something glitched on my end. Want to try again, or we could do a quick breathing exercise instead?");
+        setQuickReplies(["Try again", "Let's breathe", "It's all good"]);
+      }
+    }
+  }, [inputText, guardChat, addUserMessage, addAssistantMessage, setQuickReplies, currentSession]);
+
+  const isAuthPrompt = (content: string) =>
+    content.includes('create an account');
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isAI = item.role === 'assistant';
+    const showSignIn = isAI && isAuthPrompt(item.content);
     return (
       <View style={[styles.messageRow, isAI ? styles.aiRow : styles.userRow]}>
         <View style={[styles.bubble, isAI ? styles.aiBubble : styles.userBubble]}>
           <Text variant="body" color={Colors.primaryDark}>
             {item.content}
           </Text>
+          {showSignIn && (
+            <View style={{ alignItems: 'center', marginTop: Spacing.sm }}>
+              <Pressable
+                style={styles.inlineSignIn}
+                onPress={() => router.push('/(auth)/sign-in')}
+              >
+                <Text variant="bodyMedium" color={Colors.primary}>Create Account</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
         <Text variant="small" color={Colors.gray} style={isAI ? styles.aiTime : styles.userTime}>
           {isAI ? 'CALMAI' : 'SENT'} - {new Date(item.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
@@ -93,13 +128,7 @@ export default function ChatScreen() {
         contentContainerStyle={styles.messageList}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        ListFooterComponent={isStreaming && streamingContent ? (
-          <View style={[styles.messageRow, styles.aiRow]}>
-            <View style={[styles.bubble, styles.aiBubble]}>
-              <Text variant="body" color={Colors.primaryDark}>{streamingContent}</Text>
-            </View>
-          </View>
-        ) : null}
+        ListFooterComponent={isStreaming ? <TypingIndicator /> : null}
       />
 
       {/* Crisis Banner */}
@@ -120,7 +149,13 @@ export default function ChatScreen() {
               size="small"
               backgroundColor={Colors.grayLavender}
               textColor={Colors.primaryDark}
-              onPress={() => handleSend(item)}
+              onPress={() => {
+                if (item === "Let's do it") {
+                  router.push('/(auth)/sign-in');
+                } else {
+                  handleSend(item);
+                }
+              }}
             />
           )}
           keyExtractor={(item) => item}
@@ -260,6 +295,13 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     marginHorizontal: Spacing.base,
     borderRadius: Radius.sm,
+  },
+  inlineSignIn: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radius.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    alignItems: 'center',
   },
   sendButton: {
     width: 36,

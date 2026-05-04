@@ -17,6 +17,7 @@ interface OnboardingState {
   setReliefTag: (tag: ReliefTag) => Promise<void>;
   completeStep: (step: number) => Promise<void>;
   finish: () => Promise<void>;
+  reset: () => Promise<void>;
 }
 
 export const useOnboardingStore = create<OnboardingState>((set, get) => ({
@@ -79,5 +80,17 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     const db = await getDatabase();
     await db.runAsync('UPDATE onboarding SET is_complete = 1 WHERE id = 1');
     set({ isComplete: true });
+  },
+
+  reset: async () => {
+    const db = await getDatabase();
+    await db.runAsync('UPDATE onboarding SET completed_step = 0, selected_mood = NULL, selected_context = NULL, relief_tag = NULL, is_complete = 0 WHERE id = 1');
+    set({
+      completedStep: 0,
+      selectedMood: undefined,
+      selectedContext: undefined,
+      reliefTag: undefined,
+      isComplete: false,
+    });
   },
 }));

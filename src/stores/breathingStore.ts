@@ -69,9 +69,15 @@ export const useBreathingStore = create<BreathingState>((set, get) => ({
     const id = generateId();
     const durationSeconds = cycle * 16; // 4 phases * 4 seconds each
 
+    const now = new Date().toISOString();
     await db.runAsync(
       'INSERT INTO breathing_sessions (id, technique, duration_seconds, cycles_completed, completed, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      id, technique, durationSeconds, cycle, 1, new Date().toISOString()
+      id, technique, durationSeconds, cycle, 1, now
+    );
+
+    await db.runAsync(
+      'INSERT INTO sync_queue (table_name, record_id, operation, payload) VALUES (?, ?, ?, ?)',
+      'breathing_sessions', id, 'INSERT', JSON.stringify({ id, technique, duration_seconds: durationSeconds, cycles_completed: cycle, completed: true, created_at: now })
     );
 
     set({ isComplete: true, isActive: false });

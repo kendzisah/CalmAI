@@ -1,20 +1,37 @@
-import { useState } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { useState, useRef, useEffect } from 'react';
+import { View, StyleSheet, Pressable, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradientBackground, Text, Button } from '@/components/ui';
 import { MoodGrid } from '@/components/mood';
 import { useOnboardingStore } from '@/stores/onboardingStore';
+import { useMoodStore } from '@/stores/moodStore';
 import { Colors, Spacing } from '@/lib/constants';
 import type { MoodType } from '@/types/mood';
 
 export default function MoodCheckScreen() {
   const [selectedMood, setSelectedMood] = useState<MoodType | undefined>();
   const { setMood, completeStep } = useOnboardingStore();
+  const { checkIn } = useMoodStore();
+  const buttonOpacity = useRef(new Animated.Value(0)).current;
+  const buttonTranslate = useRef(new Animated.Value(12)).current;
+
+  useEffect(() => {
+    if (selectedMood) {
+      Animated.parallel([
+        Animated.timing(buttonOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.timing(buttonTranslate, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]).start();
+    } else {
+      buttonOpacity.setValue(0);
+      buttonTranslate.setValue(12);
+    }
+  }, [selectedMood]);
 
   const handleContinue = async () => {
     if (selectedMood) {
       await setMood(selectedMood);
+      await checkIn(selectedMood, 3, undefined, 'check_in');
     }
     await completeStep(2);
     router.push('/(auth)/context');
@@ -32,10 +49,10 @@ export default function MoodCheckScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Text variant="h1" style={styles.title}>
-            How are you feeling{'\n'}right now?
+            Real talk — how{'\n'}are you doing?
           </Text>
           <Text variant="body" color={Colors.gray} style={styles.subtitle}>
-            There's no wrong answer
+            No wrong answers here
           </Text>
         </View>
 
@@ -48,10 +65,12 @@ export default function MoodCheckScreen() {
 
         <View style={styles.footer}>
           {selectedMood && (
-            <Button
-              title="Continue"
-              onPress={handleContinue}
-            />
+            <Animated.View style={{ opacity: buttonOpacity, transform: [{ translateY: buttonTranslate }] }}>
+              <Button
+                title="Continue"
+                onPress={handleContinue}
+              />
+            </Animated.View>
           )}
           <Pressable onPress={handleSkip} style={styles.skipButton}>
             <Text variant="body" color={Colors.gray}>

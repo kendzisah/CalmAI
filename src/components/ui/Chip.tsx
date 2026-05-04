@@ -1,9 +1,5 @@
-import { Pressable, StyleSheet } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import { useRef } from 'react';
+import { Pressable, StyleSheet, Animated } from 'react-native';
 import { Colors, Radius, Spacing } from '@/lib/constants';
 import { Text } from './Text';
 
@@ -18,8 +14,6 @@ interface Props {
   size?: 'small' | 'medium';
 }
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
 export function Chip({
   label,
   selected = false,
@@ -30,40 +24,37 @@ export function Chip({
   selectedTextColor = '#FFFFFF',
   size = 'medium',
 }: Props) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
+    Animated.spring(scale, { toValue: 0.95, useNativeDriver: true }).start();
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
   };
 
   return (
-    <AnimatedPressable
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      style={[
-        styles.base,
-        size === 'small' && styles.small,
-        { backgroundColor: selected ? selectedBackgroundColor : backgroundColor },
-        animatedStyle,
-      ]}
-    >
-      <Text
-        variant={size === 'small' ? 'small' : 'caption'}
-        color={selected ? selectedTextColor : textColor}
-        style={styles.text}
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={[
+          styles.base,
+          size === 'small' && styles.small,
+          { backgroundColor: selected ? selectedBackgroundColor : backgroundColor },
+        ]}
       >
-        {label}
-      </Text>
-    </AnimatedPressable>
+        <Text
+          variant={size === 'small' ? 'small' : 'caption'}
+          color={selected ? selectedTextColor : textColor}
+          style={styles.text}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 

@@ -53,12 +53,61 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   startSession: async (moodAtStart?: string) => {
     const db = await getDatabase();
+
+    // Check for a recent session from today that we can resume
+    const today = new Date().toISOString().split('T')[0];
+    const existing = await db.getFirstAsync<{
+      id: string;
+      mood_at_start: string | null;
+      message_count: number;
+      started_at: string;
+      ended_at: string | null;
+    }>(
+      "SELECT * FROM chat_sessions WHERE started_at LIKE ? || '%' AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1",
+      today
+    );
+
+    if (existing) {
+      const session: ChatSession = {
+        id: existing.id,
+        moodAtStart: existing.mood_at_start as any,
+        messageCount: existing.message_count,
+        startedAt: existing.started_at,
+      };
+
+      // Load messages for this session
+      const rows = await db.getAllAsync<{
+        id: string;
+        session_id: string;
+        role: string;
+        content: string;
+        created_at: string;
+      }>('SELECT * FROM chat_messages WHERE session_id = ? ORDER BY created_at ASC', existing.id);
+
+      const messages: ChatMessage[] = rows.map((r) => ({
+        id: r.id,
+        sessionId: r.session_id,
+        role: r.role as 'user' | 'assistant',
+        content: r.content,
+        createdAt: r.created_at,
+      }));
+
+      set({ currentSession: session, messages, quickReplies: [] });
+      return existing.id;
+    }
+
+    // No existing session — create a new one
     const id = generateId();
     const now = new Date().toISOString();
 
     await db.runAsync(
       'INSERT INTO chat_sessions (id, mood_at_start, started_at) VALUES (?, ?, ?)',
       id, moodAtStart || null, now
+    );
+
+    await db.runAsync(
+      'INSERT INTO sync_queue (table_name, record_id, operation, payload) VALUES (?, ?, ?, ?)',
+      'chat_sessions', id, 'INSERT', JSON.stringify({ id, mood_at_start: moodAtStart || null, message_count: 0, started_at: now })
     );
 
     const session: ChatSession = {
@@ -83,6 +132,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     await db.runAsync(
       'INSERT INTO chat_messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)',
       id, currentSession.id, 'user', content, now
+    );
+
+    await db.runAsync(
+      'INSERT INTO sync_queue (table_name, record_id, operation, payload) VALUES (?, ?, ?, ?)',
+      'chat_messages', id, 'INSERT', JSON.stringify({ id, session_id: currentSession.id, role: 'user', content, created_at: now })
     );
 
     await db.runAsync(
@@ -119,6 +173,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     await db.runAsync(
       'INSERT INTO chat_messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)',
       id, currentSession.id, 'assistant', content, now
+    );
+
+    await db.runAsync(
+      'INSERT INTO sync_queue (table_name, record_id, operation, payload) VALUES (?, ?, ?, ?)',
+      'chat_messages', id, 'INSERT', JSON.stringify({ id, session_id: currentSession.id, role: 'assistant', content, created_at: now })
     );
 
     await db.runAsync(

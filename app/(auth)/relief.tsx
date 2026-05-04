@@ -4,23 +4,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradientBackground } from '@/components/ui';
 import { ReliefMoment } from '@/components/onboarding';
 import { useOnboardingStore } from '@/stores/onboardingStore';
+import { useJournalStore } from '@/stores/journalStore';
 import { Spacing } from '@/lib/constants';
+import { MOOD_TIERS } from '@/types/mood';
 import type { MoodType, MoodTier } from '@/types/mood';
 
 export default function ReliefScreen() {
-  const { completeStep } = useOnboardingStore();
-  // TODO: Read from onboardingStore
-  const mood: MoodType = 'anxious';
-  const moodTier: MoodTier = 'high_anxiety';
+  const { completeStep, selectedMood } = useOnboardingStore();
+  const { saveEntry } = useJournalStore();
+
+  const mood: MoodType = selectedMood || 'anxious';
+  const moodTier: MoodTier = MOOD_TIERS[mood];
 
   const handleComplete = async () => {
     await completeStep(4);
     router.push('/(auth)/post-relief');
   };
 
-  const handleGratitudeEntry = (text: string) => {
-    // TODO: Save as first journal entry
-    console.log('Gratitude entry:', text);
+  const handleGratitudeEntry = async (text: string) => {
+    await saveEntry(text, [mood], 'What is one thing that made today good?', false);
   };
 
   return (

@@ -1,9 +1,5 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import { useRef } from 'react';
+import { Pressable, StyleSheet, View, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Text } from '@/components/ui';
@@ -18,21 +14,15 @@ interface Props {
   size?: number;
 }
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
 export function MoodBubble({ mood, selected, onSelect, size = 56 }: Props) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  const scale = useRef(new Animated.Value(1)).current;
 
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    scale.value = withSpring(1.15, { damping: 12, stiffness: 200 });
-    setTimeout(() => {
-      scale.value = withSpring(1, { damping: 12, stiffness: 200 });
-    }, 150);
+    Animated.sequence([
+      Animated.spring(scale, { toValue: 1.15, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true }),
+    ]).start();
     onSelect(mood);
   };
 
@@ -40,7 +30,8 @@ export function MoodBubble({ mood, selected, onSelect, size = 56 }: Props) {
 
   return (
     <View style={styles.wrapper}>
-      <AnimatedPressable onPress={handlePress} style={animatedStyle}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable onPress={handlePress}>
         <View
           style={[
             styles.bubble,
@@ -63,7 +54,8 @@ export function MoodBubble({ mood, selected, onSelect, size = 56 }: Props) {
         >
           <MoodIcon mood={mood} size={size * 0.45} />
         </View>
-      </AnimatedPressable>
+      </Pressable>
+      </Animated.View>
       <Text
         variant="small"
         style={styles.label}

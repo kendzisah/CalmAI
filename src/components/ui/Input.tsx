@@ -13,8 +13,10 @@ export function Input({ multiline = false, style, ...props }: Props) {
         multiline && styles.multiline,
         style,
       ]}
+      multiline={multiline}
       placeholderTextColor={Colors.gray}
       selectionColor={Colors.primary}
+      scrollEnabled={multiline}
       {...props}
     />
   );

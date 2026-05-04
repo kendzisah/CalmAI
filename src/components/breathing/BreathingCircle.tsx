@@ -1,22 +1,14 @@
-import { StyleSheet } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  type SharedValue,
-} from 'react-native-reanimated';
+import { StyleSheet, Animated } from 'react-native';
 import { Shadows } from '@/lib/constants';
 
 interface Props {
-  scale: SharedValue<number>;
+  scale: Animated.Value;
 }
 
 const CIRCLE_SIZE = 200;
 
 export function BreathingCircle({ scale }: Props) {
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return <Animated.View style={[styles.circle, animatedStyle]} />;
+  return <Animated.View style={[styles.circle, { transform: [{ scale }] }]} />;
 }
 
 const styles = StyleSheet.create({

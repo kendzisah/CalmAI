@@ -1,14 +1,5 @@
-import { useEffect } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSequence,
-  withDelay,
-  Easing,
-  runOnJS,
-} from 'react-native-reanimated';
+import { useRef, useEffect } from 'react';
+import { View, StyleSheet, Pressable, Animated, Easing } from 'react-native';
 import { Text } from '@/components/ui';
 import { Colors, Spacing } from '@/lib/constants';
 
@@ -17,53 +8,45 @@ interface Props {
 }
 
 export function WelcomeBreath({ onReady }: Props) {
-  const circleScale = useSharedValue(0.6);
-  const textOpacity = useSharedValue(0);
-  const ctaOpacity = useSharedValue(0);
+  const circleScale = useRef(new Animated.Value(0.6)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+  const ctaOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Inhale: 0.6 → 1.0 over 4s
-    circleScale.value = withTiming(1.0, { duration: 4000, easing: Easing.inOut(Easing.ease) });
-
-    // Hold 1s, then exhale: 1.0 → 0.6 over 4s
-    circleScale.value = withSequence(
-      withTiming(1.0, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
-      withDelay(1000, withTiming(0.6, { duration: 4000, easing: Easing.inOut(Easing.ease) })),
-    );
+    // Inhale then exhale
+    Animated.sequence([
+      Animated.timing(circleScale, { toValue: 1.0, duration: 4000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.delay(1000),
+      Animated.timing(circleScale, { toValue: 0.6, duration: 4000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]).start();
 
     // "Take a breath with me" fades in after 3s
-    textOpacity.value = withDelay(3000, withTiming(1, { duration: 800 }));
+    Animated.sequence([
+      Animated.delay(3000),
+      Animated.timing(textOpacity, { toValue: 1, duration: 800, useNativeDriver: true }),
+    ]).start();
 
-    // "Tap when you're ready" fades in after animation completes (~9s)
-    ctaOpacity.value = withDelay(9000, withTiming(1, { duration: 600 }));
+    // "Tap when you're ready" fades in after ~9s
+    Animated.sequence([
+      Animated.delay(9000),
+      Animated.timing(ctaOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+    ]).start();
   }, []);
-
-  const circleAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: circleScale.value }],
-  }));
-
-  const textAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: textOpacity.value,
-  }));
-
-  const ctaAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: ctaOpacity.value,
-  }));
 
   return (
     <Pressable style={styles.container} onPress={onReady}>
       <View style={styles.content}>
-        <Animated.View style={[styles.circle, circleAnimatedStyle]} />
+        <Animated.View style={[styles.circle, { transform: [{ scale: circleScale }] }]} />
 
-        <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
+        <Animated.View style={[styles.textContainer, { opacity: textOpacity }]}>
           <Text variant="h2" color={Colors.primaryDark} style={styles.breathText}>
-            Take a breath with me.
+            Breathe with me for a sec.
           </Text>
         </Animated.View>
 
-        <Animated.View style={[styles.ctaContainer, ctaAnimatedStyle]}>
+        <Animated.View style={[styles.ctaContainer, { opacity: ctaOpacity }]}>
           <Text variant="body" color={Colors.gray} style={styles.ctaText}>
-            Tap when you're ready
+            Tap anywhere when you're ready
           </Text>
         </Animated.View>
       </View>

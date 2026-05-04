@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useSharedValue, withTiming, Easing } from 'react-native-reanimated';
+import { Animated, Easing } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useBreathingStore } from '@/stores/breathingStore';
 import { PHASE_ORDER } from '@/types/breathing';
@@ -13,9 +13,11 @@ export function useBreathingTimer() {
     setPhase, setCountdown, setCycle, complete,
   } = useBreathingStore();
 
-  const circleScale = useSharedValue(0.6);
+  const circleScale = useRef(new Animated.Value(0.6)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const countdownRef = useRef<ReturnType<typeof setInterval>>();
+  const progressAnimRef = useRef<Animated.CompositeAnimation>();
 
   useEffect(() => {
     if (!isActive || isPaused || isComplete) return;
@@ -32,11 +34,27 @@ export function useBreathingTimer() {
     // Haptic on phase change
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+    // Animate progress ring smoothly across this phase
+    const phaseIndex = PHASE_ORDER.indexOf(phase);
+    const startProgress = ((cycle - 1) * 4 + phaseIndex) / (totalCycles * 4);
+    const endProgress = ((cycle - 1) * 4 + phaseIndex + 1) / (totalCycles * 4);
+    progressAnim.setValue(startProgress);
+    if (progressAnimRef.current) progressAnimRef.current.stop();
+    progressAnimRef.current = Animated.timing(progressAnim, {
+      toValue: endProgress,
+      duration: config.ms,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    });
+    progressAnimRef.current.start();
+
     // Animate circle
-    circleScale.value = withTiming(config.scale, {
+    Animated.timing(circleScale, {
+      toValue: config.scale,
       duration: config.ms,
       easing: Easing.inOut(Easing.ease),
-    });
+      useNativeDriver: true,
+    }).start();
 
     // Countdown
     let count = 4;
@@ -69,10 +87,11 @@ export function useBreathingTimer() {
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current);
       if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
+      if (progressAnimRef.current) progressAnimRef.current.stop();
     };
   }, [phase, cycle, isPaused, isActive, isComplete]);
 
-  // Progress calculation
+  // Discrete progress for non-animated uses
   const phaseIndex = PHASE_ORDER.indexOf(phase);
   const cycleProgress = (phaseIndex * 4 + (4 - countdown)) / 16;
   const totalProgress = ((cycle - 1) + cycleProgress) / totalCycles;
@@ -80,7 +99,7 @@ export function useBreathingTimer() {
   return {
     phase, countdown, cycle, totalCycles,
     isPaused, isActive, isComplete, technique,
-    circleScale, totalProgress,
+    circleScale, totalProgress, progressAnim,
     start, pause, resume, reset,
   };
 }

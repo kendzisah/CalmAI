@@ -1,13 +1,5 @@
-import { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSequence,
-  withDelay,
-  Easing,
-} from 'react-native-reanimated';
+import { useEffect, useState, useRef } from 'react';
+import { View, StyleSheet, Animated, Easing } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Text, Input, Button } from '@/components/ui';
 import { Colors, Spacing } from '@/lib/constants';
@@ -21,10 +13,10 @@ interface Props {
 }
 
 const LOW_ENERGY_MESSAGES: Partial<Record<MoodType, string>> = {
-  sad: "Hey. I'm really glad you're here. Feeling sad is heavy, and you don't have to carry that alone. I'm here whenever you want to talk, or even just sit quietly together.",
-  irritable: "I hear you. When everything feels like too much, it makes sense to feel on edge. You don't need to be 'nice' right now. Let's just breathe for a second.",
-  lonely: "You reached out \u2014 and that matters. Even though I'm an AI, I'm here with you, and there are real women in this community who understand what you're feeling.",
-  numb: "Sometimes feeling nothing is its own kind of hard. You don't have to force yourself to feel something. Just being here is enough for now.",
+  sad: "Hey. I see you, and I'm glad you're here. Sadness hits different when you're carrying it alone. You don't have to do that anymore.",
+  irritable: "Totally valid. When everything is too much, of course you're on edge. You don't have to mask it right now. Let's just take a breath.",
+  lonely: "You showed up, and that takes guts. I'm here with you, and trust me — so many others get exactly what you're feeling.",
+  numb: "Feeling nothing? That's its own kind of exhausting. You don't have to force anything right now. Just being here is enough.",
 };
 
 export function ReliefMoment({ mood, moodTier, onComplete, onGratitudeEntry }: Props) {
@@ -42,7 +34,7 @@ function MiniBreathingExercise({ onComplete }: { onComplete: () => void }) {
   const [cycle, setCycle] = useState(1);
   const [phase, setPhase] = useState<'inhale' | 'hold' | 'exhale' | 'hold2'>('inhale');
   const [countdown, setCountdown] = useState(4);
-  const circleScale = useSharedValue(0.6);
+  const circleScale = useRef(new Animated.Value(0.6)).current;
 
   useEffect(() => {
     const phases: Array<{ phase: string; duration: number; scale: number }> = [
@@ -66,10 +58,12 @@ function MiniBreathingExercise({ onComplete }: { onComplete: () => void }) {
       setCountdown(4);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      circleScale.value = withTiming(p.scale, {
+      Animated.timing(circleScale, {
+        toValue: p.scale,
         duration: p.duration,
         easing: Easing.inOut(Easing.ease),
-      });
+        useNativeDriver: true,
+      }).start();
 
       // Countdown
       let count = 4;
@@ -93,15 +87,11 @@ function MiniBreathingExercise({ onComplete }: { onComplete: () => void }) {
     runPhase();
   }, []);
 
-  const circleAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: circleScale.value }],
-  }));
-
   const phaseLabel = phase === 'inhale' ? 'Inhale...' : phase === 'exhale' ? 'Exhale...' : 'Hold...';
 
   return (
     <View style={styles.breathContainer}>
-      <Animated.View style={[styles.breathCircle, circleAnimStyle]}>
+      <Animated.View style={[styles.breathCircle, { transform: [{ scale: circleScale }] }]}>
         <Text variant="h2" color={Colors.primaryDark}>{phaseLabel}</Text>
         <Text variant="h1" color={Colors.primaryDark}>{countdown}</Text>
       </Animated.View>
@@ -155,9 +145,9 @@ function GratitudeMoment({ onComplete, onEntry }: { onComplete: () => void; onEn
 
   return (
     <View style={styles.gratitudeContainer}>
-      <Text variant="h2" style={styles.gratitudeTitle}>Capture this feeling.</Text>
+      <Text variant="h2" style={styles.gratitudeTitle}>Hold onto this feeling.</Text>
       <Text variant="body" color={Colors.gray} style={styles.gratitudeSubtext}>
-        What's one thing that made today good?
+        What's one thing that hit different today (in a good way)?
       </Text>
       <Input
         placeholder="A warm cup of coffee... a text from a friend..."

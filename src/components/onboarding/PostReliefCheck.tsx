@@ -1,9 +1,5 @@
-import { View, StyleSheet, Pressable } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-} from 'react-native-reanimated';
+import { useRef } from 'react';
+import { View, StyleSheet, Pressable, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Path } from 'react-native-svg';
 import { Text } from '@/components/ui';
@@ -13,8 +9,6 @@ import type { ReliefTag } from '@/types/user';
 interface Props {
   onSelect: (tag: ReliefTag) => void;
 }
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const OPTIONS: Array<{
   tag: ReliefTag;
@@ -28,21 +22,21 @@ const OPTIONS: Array<{
     label: 'A little better',
     color: Colors.sageGreen,
     icon: 'check',
-    response: "That's what we're here for.",
+    response: "Love that for you.",
   },
   {
     tag: 'relief_neutral',
     label: 'About the same',
     color: '#E5E7EB',
     icon: 'neutral',
-    response: "That's okay. This takes time.",
+    response: "That's okay. Healing isn't linear.",
   },
   {
     tag: 'relief_not_yet',
     label: "Not yet, and that's okay",
     color: Colors.cream,
     icon: 'heart',
-    response: 'You showed up, and that counts for a lot.',
+    response: "The fact that you're here? That's the win.",
   },
 ];
 
@@ -82,7 +76,7 @@ export function PostReliefCheck({ onSelect }: Props) {
   return (
     <View style={styles.container}>
       <Text variant="h1" style={styles.question}>
-        How do you feel now?
+        How are you feeling now?
       </Text>
 
       <View style={styles.options}>
@@ -108,28 +102,26 @@ function ReliefOption({
   option: (typeof OPTIONS)[number];
   onPress: () => void;
 }) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  const scale = useRef(new Animated.Value(1)).current;
 
   return (
-    <AnimatedPressable
-      onPress={onPress}
-      onPressIn={() => {
-        scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
-      }}
-      onPressOut={() => {
-        scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-      }}
-      style={[styles.option, { backgroundColor: option.color }, animatedStyle]}
-    >
-      <OptionIcon icon={option.icon} />
-      <Text variant="bodyMedium" color={Colors.primaryDark}>
-        {option.label}
-      </Text>
-    </AnimatedPressable>
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => {
+          Animated.spring(scale, { toValue: 0.97, useNativeDriver: true }).start();
+        }}
+        onPressOut={() => {
+          Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
+        }}
+        style={[styles.option, { backgroundColor: option.color }]}
+      >
+        <OptionIcon icon={option.icon} />
+        <Text variant="bodyMedium" color={Colors.primaryDark}>
+          {option.label}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 

@@ -1,23 +1,38 @@
 import { useState } from 'react';
-import { View, StyleSheet, Pressable, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
-import { Text, Button, Card } from '@/components/ui';
+import { Text, Button } from '@/components/ui';
 import { Colors, Spacing, Radius } from '@/lib/constants';
 import { useSubscription } from '@/hooks/useSubscription';
 
 type Plan = 'monthly' | 'annual';
 
 const BENEFITS = [
-  'Unlimited AI conversations, anytime you need support',
-  'Unlimited journal entries with AI-generated prompts',
-  'Weekly mood insights and pattern analysis',
+  'Unlimited convos with your AI companion, whenever you need',
+  'Unlimited journal entries with personalized prompts',
+  'Weekly mood insights so you can actually track your growth',
 ];
 
 export default function PaywallScreen() {
   const [selectedPlan, setSelectedPlan] = useState<Plan>('annual');
-  const { purchaseMonthly, purchaseAnnual, restorePurchases } = useSubscription();
+  const { offerings, isLoading, purchaseMonthly, purchaseAnnual, restorePurchases } = useSubscription();
+
+  const annualPkg = offerings.annual;
+  const monthlyPkg = offerings.monthly;
+
+  // Use dynamic prices from RevenueCat, fall back to display prices
+  const annualPrice = annualPkg?.product.priceString || '$69.99';
+  const annualPeriod = '/year';
+  const monthlyPrice = monthlyPkg?.product.priceString || '$9.99';
+  const monthlyPeriod = '/month';
+
+  // Calculate savings if both prices available
+  const monthlyNumeric = monthlyPkg?.product.price ?? 9.99;
+  const annualNumeric = annualPkg?.product.price ?? 69.99;
+  const monthlyEquivalent = (annualNumeric / 12).toFixed(2);
+  const savingsPercent = Math.round((1 - annualNumeric / (monthlyNumeric * 12)) * 100);
 
   const handlePurchase = async () => {
     try {
@@ -27,11 +42,17 @@ export default function PaywallScreen() {
         await purchaseMonthly();
       }
       router.back();
-    } catch (err: any) {
-      if (err?.userCancelled) return;
-      Alert.alert('Purchase Error', 'Something went wrong. Please try again.');
+    } catch {
+      // Error handled inside useSubscription
     }
   };
+
+  // Check if the selected package has a free trial
+  const selectedPkg = selectedPlan === 'annual' ? annualPkg : monthlyPkg;
+  const hasIntroOffer = selectedPkg?.product.introPrice != null;
+  const ctaText = hasIntroOffer
+    ? `Start ${selectedPkg!.product.introPrice!.periodNumberOfUnits}-${selectedPkg!.product.introPrice!.periodUnit === 'DAY' ? 'Day' : 'Week'} Free Trial`
+    : 'Subscribe Now';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -51,9 +72,9 @@ export default function PaywallScreen() {
               <Circle cx="12" cy="12" r="9" stroke={Colors.primary} strokeWidth={2} />
             </Svg>
           </View>
-          <Text variant="h1" style={styles.title}>Unlock Your Calm</Text>
+          <Text variant="h1" style={styles.title}>Level Up Your Calm</Text>
           <Text variant="body" color={Colors.gray} style={styles.subtitle}>
-            Your companion is ready for unlimited conversations
+            Your companion is ready whenever you are
           </Text>
         </View>
 
@@ -86,10 +107,14 @@ export default function PaywallScreen() {
             </View>
             <Text variant="bodyMedium">Annual</Text>
             <View style={styles.priceRow}>
-              <Text variant="h1">$69.99</Text>
-              <Text variant="caption">/year</Text>
+              <Text variant="h1">{annualPrice}</Text>
+              <Text variant="caption">{annualPeriod}</Text>
             </View>
-            <Text variant="small" color={Colors.sageGreen}>Save 42% - $5.83/month</Text>
+            {savingsPercent > 0 && (
+              <Text variant="small" color={Colors.sageGreen}>
+                Save {savingsPercent}% — ${monthlyEquivalent}/month
+              </Text>
+            )}
           </Pressable>
 
           {/* Monthly */}
@@ -102,24 +127,25 @@ export default function PaywallScreen() {
           >
             <Text variant="bodyMedium">Monthly</Text>
             <View style={styles.priceRow}>
-              <Text variant="h1">$9.99</Text>
-              <Text variant="caption">/month</Text>
+              <Text variant="h1">{monthlyPrice}</Text>
+              <Text variant="caption">{monthlyPeriod}</Text>
             </View>
           </Pressable>
         </View>
 
         {/* CTA */}
         <Button
-          title="Start 7-Day Free Trial"
+          title={isLoading ? 'Processing...' : ctaText}
           onPress={handlePurchase}
+          disabled={isLoading}
         />
 
         {/* Footer */}
         <Text variant="caption" style={styles.footer}>
-          No commitment. Cancel anytime.
+          No strings attached. Cancel whenever.
         </Text>
 
-        <Pressable onPress={restorePurchases}>
+        <Pressable onPress={restorePurchases} disabled={isLoading}>
           <Text variant="small" color={Colors.primary} style={styles.restore}>
             Restore purchases
           </Text>

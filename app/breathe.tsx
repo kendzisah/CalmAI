@@ -1,10 +1,9 @@
 import { useEffect } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable, Animated } from 'react-native';
 import { router } from 'expo-router';
-import Animated, {
-  useAnimatedStyle,
-} from 'react-native-reanimated';
 import Svg, { Circle as SvgCircle, Path } from 'react-native-svg';
+
+const AnimatedSvgCircle = Animated.createAnimatedComponent(SvgCircle);
 import { Text } from '@/components/ui';
 import { Colors, Spacing } from '@/lib/constants';
 import { useBreathingTimer } from '@/hooks/useBreathingTimer';
@@ -15,24 +14,28 @@ export default function BreatheScreen() {
   const {
     phase, countdown, cycle, totalCycles,
     isPaused, isActive, isComplete,
-    circleScale, totalProgress,
+    circleScale, totalProgress, progressAnim,
     start, pause, resume, reset,
   } = useBreathingTimer();
+
+  const CIRCUMFERENCE = 2 * Math.PI * 110;
+  const animatedStrokeDashoffset = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [CIRCUMFERENCE, 0],
+  });
 
   useEffect(() => {
     start(4, 'box');
     return () => reset();
   }, []);
 
-  const circleAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: circleScale.value }],
-  }));
+  const circleAnimStyle = { transform: [{ scale: circleScale }] };
 
   const instructions: Record<BreathingPhase, string> = {
-    inhale: 'Let the air fill your lungs completely, as the circle grows.',
-    hold1: 'Hold gently. Feel the stillness.',
-    exhale: 'Release slowly. Let everything go.',
-    hold2: 'Rest in the emptiness for a moment.',
+    inhale: 'Big inhale. Let your lungs fill all the way up.',
+    hold1: 'Hold it right here. You got this.',
+    exhale: 'Slowly let it go. Release everything.',
+    hold2: "Just be still for a moment. You're doing great.",
   };
 
   if (isComplete) {
@@ -40,7 +43,7 @@ export default function BreatheScreen() {
       <View style={[styles.container, { backgroundColor: Colors.primary }]}>
         <View style={styles.completeContent}>
           <Text variant="h1" style={{ color: '#FFFFFF', textAlign: 'center' }}>
-            You just did something{'\n'}really good for yourself.
+            You just did{'\n'}something amazing.
           </Text>
           <Pressable
             style={styles.doneButton}
@@ -77,13 +80,13 @@ export default function BreatheScreen() {
               strokeWidth={4}
               fill="none"
             />
-            <SvgCircle
+            <AnimatedSvgCircle
               cx={120} cy={120} r={110}
               stroke={Colors.lavenderLight}
               strokeWidth={4}
               fill="none"
-              strokeDasharray={`${2 * Math.PI * 110}`}
-              strokeDashoffset={`${2 * Math.PI * 110 * (1 - totalProgress)}`}
+              strokeDasharray={`${CIRCUMFERENCE}`}
+              strokeDashoffset={animatedStrokeDashoffset}
               strokeLinecap="round"
               transform="rotate(-90 120 120)"
             />

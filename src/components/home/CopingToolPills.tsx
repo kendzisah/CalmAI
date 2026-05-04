@@ -1,15 +1,9 @@
-import { View, Pressable, StyleSheet } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import { useRef } from 'react';
+import { View, Pressable, StyleSheet, Animated } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { Text } from '@/components/ui';
 import { Colors, Spacing, Radius } from '@/lib/constants';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function BreatheIcon() {
   return (
@@ -55,28 +49,26 @@ interface PillProps {
 }
 
 function Pill({ label, color, icon, onPress }: PillProps) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  const scale = useRef(new Animated.Value(1)).current;
 
   return (
-    <AnimatedPressable
-      onPress={onPress}
-      onPressIn={() => {
-        scale.value = withSpring(0.93, { damping: 15, stiffness: 300 });
-      }}
-      onPressOut={() => {
-        scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-      }}
-      style={[styles.pill, { backgroundColor: color }, animatedStyle]}
-    >
-      {icon}
-      <Text variant="bodyMedium" color="#FFFFFF" style={styles.pillLabel}>
-        {label}
-      </Text>
-    </AnimatedPressable>
+    <Animated.View style={{ transform: [{ scale }], flex: 1 }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => {
+          Animated.spring(scale, { toValue: 0.93, useNativeDriver: true }).start();
+        }}
+        onPressOut={() => {
+          Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
+        }}
+        style={[styles.pill, { backgroundColor: color }]}
+      >
+        {icon}
+        <Text variant="bodyMedium" color="#FFFFFF" style={styles.pillLabel}>
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
