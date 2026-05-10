@@ -1,6 +1,7 @@
 import { Tabs, router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Colors } from '@/lib/constants';
+import { StatusBar } from 'expo-status-bar';
+import { useTheme } from '@/theme';
 import Svg, { Path, Circle } from 'react-native-svg';
 
 function HomeIcon({ color, size }: { color: string; size: number }) {
@@ -69,12 +70,18 @@ function ProfileIcon({ color, size }: { color: string; size: number }) {
 }
 
 function BreatheTabButton() {
+  const { theme } = useTheme();
   return (
     <Pressable
       style={styles.breatheButton}
       onPress={() => router.push('/breathe')}
     >
-      <View style={styles.breatheCircle}>
+      <View
+        style={[
+          styles.breatheCircle,
+          { backgroundColor: theme.primary, shadowColor: theme.primary },
+        ]}
+      >
         <BreatheIcon color="#FFFFFF" size={24} />
       </View>
     </Pressable>
@@ -82,16 +89,20 @@ function BreatheTabButton() {
 }
 
 export default function TabsLayout() {
+  const { theme, themeName } = useTheme();
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.gray,
-        tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: styles.tabLabel,
-      }}
-    >
+    <>
+      {/* Theme-aware status bar overrides the default one set in app/_layout.tsx */}
+      <StatusBar style={themeName === 'dark' ? 'light' : 'dark'} />
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: theme.primary,
+          tabBarInactiveTintColor: theme.textMuted,
+          tabBarStyle: [styles.tabBar, { backgroundColor: theme.surface, borderTopColor: theme.borderMuted }],
+          tabBarLabelStyle: styles.tabLabel,
+        }}
+      >
       <Tabs.Screen
         name="home"
         options={{
@@ -127,14 +138,14 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <ProfileIcon color={color} size={22} />,
         }}
       />
-    </Tabs>
+      </Tabs>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: Colors.surface,
-    borderTopWidth: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
@@ -157,11 +168,9 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

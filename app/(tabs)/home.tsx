@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Button, Chip } from '@/components/ui';
 import { MoodTrendChart } from '@/components/mood';
 import { Colors, Spacing, Radius } from '@/lib/constants';
+import { useThemeColors } from '@/theme';
 import { useMoodStore } from '@/stores/moodStore';
 import { MoodGrid } from '@/components/mood';
 import { useOnboardingStore } from '@/stores/onboardingStore';
@@ -14,10 +15,11 @@ import { getGreeting } from '@/utils/dateHelpers';
 import { supabase } from '@/lib/supabase';
 
 export default function HomeScreen() {
+  const colors = useThemeColors();
   const { currentMood, todayCheckedIn, monthlyCount, recentEntries, loadRecent, checkIn, getTrendData, trendData } = useMoodStore();
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [selectedCheckInMood, setSelectedCheckInMood] = useState<import('@/types/mood').MoodType | undefined>();
-  const { selectedMood: onboardingMood } = useOnboardingStore();
+  const { selectedMood: onboardingMood, nickname } = useOnboardingStore();
   const { currentSession, messages } = useChatStore();
   const [weeklyInsight, setWeeklyInsight] = useState<string | null>(null);
 
@@ -59,21 +61,21 @@ export default function HomeScreen() {
   const lastAiMessage = messages.filter(m => m.role === 'assistant').slice(-1)[0];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text variant="h1">{greeting},{'\n'}you</Text>
-          <Text variant="body" color={Colors.gray}>
+          <Text variant="h1">{greeting},{'\n'}{nickname || 'you'}</Text>
+          <Text variant="body" color={colors.textMuted}>
             Let's check in with yourself today
           </Text>
         </View>
 
         {/* Daily Check-In Card */}
-        <Card style={styles.checkInCard}>
+        <Card>
           {todayCheckedIn ? (
             <View style={styles.checkInRow}>
               <Text variant="bodyMedium">You showed up today</Text>
@@ -101,7 +103,8 @@ export default function HomeScreen() {
           )}
         </Card>
 
-        {/* Coping Tool Pills */}
+        {/* Coping Tool Pills — keep brand-tinted backgrounds in both themes;
+            text always uses brand-dark for legibility on those pastel chips. */}
         <View style={styles.pillRow}>
           <Chip
             label="Breathe"
@@ -134,15 +137,15 @@ export default function HomeScreen() {
 
         {/* Weekly Insight */}
         {weeklyInsight && (
-          <Card style={{ backgroundColor: '#F5F0FF', gap: Spacing.sm }}>
-            <Text variant="label" color={Colors.primary}>Weekly Insight</Text>
+          <Card style={{ backgroundColor: colors.surfaceMuted, gap: Spacing.sm }}>
+            <Text variant="label" color={colors.primary}>Weekly Insight</Text>
             <Text variant="body">{weeklyInsight}</Text>
           </Card>
         )}
 
         {/* Cumulative Counter */}
         <View style={styles.counterRow}>
-          <Text variant="body" color={Colors.primaryDark}>
+          <Text variant="body">
             You've checked in {monthlyCount} times this month
           </Text>
         </View>
@@ -154,7 +157,7 @@ export default function HomeScreen() {
 
         {/* Session CTA — only show if there's an active session */}
         {hasActiveSession && lastAiMessage && (
-          <Card variant="elevated" style={styles.sessionCard}>
+          <Card variant="elevated" style={[styles.sessionCard, { backgroundColor: colors.primary }]}>
             <Text variant="label" color="rgba(255,255,255,0.7)">Continue Conversation</Text>
             <Text variant="bodyMedium" style={styles.sessionPreview} numberOfLines={2}>
               {lastAiMessage.content}
@@ -163,14 +166,14 @@ export default function HomeScreen() {
               onPress={() => router.push('/(tabs)/chat')}
               style={styles.sessionButton}
             >
-              <Text variant="bodyMedium" color={Colors.primary}>Continue</Text>
+              <Text variant="bodyMedium" color={colors.primary}>Continue</Text>
             </Pressable>
           </Card>
         )}
 
         {/* Quick start CTA if no active session */}
         {!hasActiveSession && (
-          <Card variant="elevated" style={styles.sessionCard}>
+          <Card variant="elevated" style={[styles.sessionCard, { backgroundColor: colors.primary }]}>
             <Text variant="label" color="rgba(255,255,255,0.7)">Talk to CalmAI</Text>
             <Text variant="h2" style={styles.sessionTitle}>
               Need to{'\n'}Talk It Out?
@@ -182,7 +185,7 @@ export default function HomeScreen() {
               onPress={() => router.push('/(tabs)/chat')}
               style={styles.sessionButton}
             >
-              <Text variant="bodyMedium" color={Colors.primary}>Start Chatting</Text>
+              <Text variant="bodyMedium" color={colors.primary}>Start Chatting</Text>
             </Pressable>
           </Card>
         )}
@@ -194,7 +197,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scrollContent: {
     padding: Spacing.lg,
@@ -204,9 +206,6 @@ const styles = StyleSheet.create({
   header: {
     gap: Spacing.xs,
     marginBottom: Spacing.sm,
-  },
-  checkInCard: {
-    backgroundColor: Colors.surface,
   },
   checkInExpanded: {
     gap: Spacing.md,
@@ -235,7 +234,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   sessionCard: {
-    backgroundColor: Colors.primary,
     gap: Spacing.sm,
   },
   sessionTitle: {

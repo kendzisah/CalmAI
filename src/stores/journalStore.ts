@@ -20,6 +20,7 @@ interface JournalState {
   getLifetimeCount: () => Promise<number>;
   getDailyPrompt: () => Promise<JournalPrompt | null>;
   saveDailyPrompt: (prompt: JournalPrompt) => Promise<void>;
+  reset: () => void;
 }
 
 const FALLBACK_PROMPTS = [
@@ -257,6 +258,16 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     const count = result?.count || 0;
     set({ lifetimeCount: count });
     return count;
+  },
+
+  reset: () => {
+    set({
+      entries: [],
+      currentPrompt: null,
+      todayEntry: null,
+      lifetimeCount: 0,
+      hasRefreshedPrompt: false,
+    });
   },
 }));
 

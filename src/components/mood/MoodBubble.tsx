@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Text } from '@/components/ui';
 import { MoodColors, Colors, Spacing } from '@/lib/constants';
+import { useThemeColors } from '@/theme';
 import type { MoodType } from '@/types/mood';
 import { MOOD_LABELS } from '@/types/mood';
 
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function MoodBubble({ mood, selected, onSelect, size = 56 }: Props) {
+  const colors = useThemeColors();
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePress = () => {
@@ -26,7 +28,9 @@ export function MoodBubble({ mood, selected, onSelect, size = 56 }: Props) {
     onSelect(mood);
   };
 
-  const bgColor = MoodColors[mood] || Colors.grayLavender;
+  // Mood pastel backgrounds stay constant — they're brand-tinted accents.
+  // Falls back to the theme's grayLavender (different in dark mode).
+  const bgColor = MoodColors[mood] || colors.grayLavender;
 
   return (
     <View style={styles.wrapper}>
@@ -43,8 +47,8 @@ export function MoodBubble({ mood, selected, onSelect, size = 56 }: Props) {
             },
             selected && {
               borderWidth: 2.5,
-              borderColor: Colors.primary,
-              shadowColor: Colors.primary,
+              borderColor: colors.primary,
+              shadowColor: colors.primary,
               shadowOffset: { width: 0, height: 0 },
               shadowOpacity: 0.4,
               shadowRadius: 8,
@@ -59,7 +63,7 @@ export function MoodBubble({ mood, selected, onSelect, size = 56 }: Props) {
       <Text
         variant="small"
         style={styles.label}
-        color={selected ? Colors.primaryDark : Colors.gray}
+        color={selected ? colors.text : colors.textMuted}
       >
         {MOOD_LABELS[mood].toUpperCase()}
       </Text>

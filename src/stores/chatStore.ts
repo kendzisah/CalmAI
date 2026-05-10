@@ -20,6 +20,7 @@ interface ChatState {
   setQuickReplies: (replies: string[]) => void;
   endSession: (moodAtEnd?: string) => Promise<void>;
   getWeeklySessionCount: () => Promise<number>;
+  reset: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -251,5 +252,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const count = result?.count || 0;
     set({ weeklySessionCount: count });
     return count;
+  },
+
+  reset: () => {
+    set({
+      messages: [],
+      currentSession: null,
+      isStreaming: false,
+      streamingContent: '',
+      quickReplies: [],
+      weeklySessionCount: 0,
+    });
   },
 }));

@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { Pressable, StyleSheet, ViewStyle, TextStyle, Animated } from 'react-native';
-import { Colors, Radius, Spacing, Typography } from '@/lib/constants';
+import { Radius, Spacing } from '@/lib/constants';
+import { useThemeColors } from '@/theme';
 import { Text } from './Text';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'pill';
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function Button({ title, onPress, variant = 'primary', disabled = false, style }: Props) {
+  const colors = useThemeColors();
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -24,6 +26,20 @@ export function Button({ title, onPress, variant = 'primary', disabled = false, 
     Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
   };
 
+  // Primary stays branded — same lavender in both themes. Secondary/ghost
+  // borrow the themed primary color so they stay readable on dark surfaces.
+  const containerStyle: ViewStyle =
+    variant === 'primary'
+      ? { backgroundColor: colors.primary, borderRadius: Radius.md }
+      : variant === 'secondary'
+      ? { backgroundColor: 'transparent', borderRadius: Radius.md, borderWidth: 1.5, borderColor: colors.primary }
+      : variant === 'pill'
+      ? { backgroundColor: colors.primary, borderRadius: Radius.pill, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.base }
+      : { backgroundColor: 'transparent' }; // ghost
+
+  const textColor: TextStyle['color'] =
+    variant === 'primary' || variant === 'pill' ? '#FFFFFF' : colors.primary;
+
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
       <Pressable
@@ -33,14 +49,15 @@ export function Button({ title, onPress, variant = 'primary', disabled = false, 
         disabled={disabled}
         style={[
           styles.base,
-          variantContainerStyles[variant],
+          containerStyle,
           disabled && styles.disabled,
           style,
         ]}
       >
         <Text
           variant="bodyMedium"
-          style={[styles.text, variantTextStyles[variant]]}
+          color={textColor}
+          style={[styles.text, variant === 'pill' ? styles.pillText : null]}
         >
           {title}
         </Text>
@@ -62,33 +79,7 @@ const styles = StyleSheet.create({
   text: {
     textAlign: 'center',
   },
-});
-
-const variantContainerStyles = StyleSheet.create({
-  primary: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.md,
-  },
-  secondary: {
-    backgroundColor: 'transparent',
-    borderRadius: Radius.md,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-  },
-  ghost: {
-    backgroundColor: 'transparent',
-  },
-  pill: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.pill,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.base,
+  pillText: {
+    fontSize: 14,
   },
 });
-
-const variantTextStyles: Record<ButtonVariant, TextStyle> = {
-  primary: { color: '#FFFFFF' },
-  secondary: { color: Colors.primary },
-  ghost: { color: Colors.primary },
-  pill: { color: '#FFFFFF', fontSize: 14 },
-};

@@ -9,14 +9,37 @@ import { Colors, Spacing } from '@/lib/constants';
 import { useBreathingTimer } from '@/hooks/useBreathingTimer';
 import { PHASE_LABELS } from '@/types/breathing';
 import type { BreathingPhase } from '@/types/breathing';
+import {
+  preloadBreathingAudio,
+  playInhale,
+  playExhale,
+  stopBreathingAudio,
+} from '@/lib/breathingAudio';
+import { useBreathingAudioStore } from '@/stores/breathingAudioStore';
+import { ThemeProvider } from '@/theme';
 
+// Public export wraps the screen body in a forced-light ThemeProvider.
+// The breathing experience uses a bold lavender background that doesn't
+// invert well, so we keep it visually consistent regardless of preference.
 export default function BreatheScreen() {
+  return (
+    <ThemeProvider force="light">
+      <BreatheScreenInner />
+    </ThemeProvider>
+  );
+}
+
+function BreatheScreenInner() {
   const {
     phase, countdown, cycle, totalCycles,
     isPaused, isActive, isComplete,
     circleScale, totalProgress, progressAnim,
     start, pause, resume, reset,
   } = useBreathingTimer();
+
+  const muted = useBreathingAudioStore((s) => s.muted);
+  const toggleMuted = useBreathingAudioStore((s) => s.toggle);
+  const hydrateMute = useBreathingAudioStore((s) => s.hydrate);
 
   const CIRCUMFERENCE = 2 * Math.PI * 110;
   const animatedStrokeDashoffset = progressAnim.interpolate({
@@ -25,9 +48,27 @@ export default function BreatheScreen() {
   });
 
   useEffect(() => {
+    hydrateMute();
+    preloadBreathingAudio();
     start(4, 'box');
-    return () => reset();
+    return () => {
+      reset();
+      stopBreathingAudio();
+    };
   }, []);
+
+  // Play the appropriate sound at the start of each inhale/exhale phase.
+  // hold1 / hold2 are intentionally silent.
+  useEffect(() => {
+    if (!isActive || isPaused || isComplete) return;
+    if (phase === 'inhale') playInhale();
+    else if (phase === 'exhale') playExhale();
+  }, [phase, isActive, isPaused, isComplete]);
+
+  // Stop any in-flight playback when the user mutes mid-breath.
+  useEffect(() => {
+    if (muted) stopBreathingAudio();
+  }, [muted]);
 
   const circleAnimStyle = { transform: [{ scale: circleScale }] };
 
@@ -112,11 +153,12 @@ export default function BreatheScreen() {
         </Text>
       </View>
 
-      {/* Pause Button */}
+      {/* Footer controls */}
       <View style={styles.footer}>
         <Pressable
-          style={styles.pauseButton}
+          style={styles.controlButton}
           onPress={() => isPaused ? resume() : pause()}
+          accessibilityLabel={isPaused ? 'Resume' : 'Pause'}
         >
           <Svg width={24} height={24} viewBox="0 0 24 24" fill="#FFFFFF">
             {isPaused ? (
@@ -124,6 +166,27 @@ export default function BreatheScreen() {
             ) : (
               <>
                 <Path d="M6 4h4v16H6zM14 4h4v16h-4z" />
+              </>
+            )}
+          </Svg>
+        </Pressable>
+
+        <Pressable
+          style={styles.controlButton}
+          onPress={() => toggleMuted()}
+          accessibilityLabel={muted ? 'Unmute breathing sounds' : 'Mute breathing sounds'}
+        >
+          <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+            {muted ? (
+              <>
+                <Path d="M11 5L6 9H3v6h3l5 4V5z" fill="#FFFFFF" />
+                <Path d="M16 9l5 5M21 9l-5 5" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" />
+              </>
+            ) : (
+              <>
+                <Path d="M11 5L6 9H3v6h3l5 4V5z" fill="#FFFFFF" />
+                <Path d="M16 8c1.5 1 1.5 7 0 8" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" />
+                <Path d="M19 5c3 2.5 3 11.5 0 14" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" />
               </>
             )}
           </Svg>
@@ -184,10 +247,13 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
   },
   footer: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.lg,
     paddingBottom: 60,
   },
-  pauseButton: {
+  controlButton: {
     width: 56,
     height: 56,
     borderRadius: 28,

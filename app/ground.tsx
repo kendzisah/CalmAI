@@ -1,11 +1,24 @@
 import { useState, useRef } from 'react';
-import { View, StyleSheet, Pressable, TextInput, Animated, Easing } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Keyboard,
+  TouchableWithoutFeedback,
+} from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { Text, Button } from '@/components/ui';
 import { Colors, Spacing, Radius } from '@/lib/constants';
+import { ThemeProvider } from '@/theme';
 
 const STEPS = [
   { count: 5, sense: 'SEE', prompt: 'Look around. What are 5 things you can see?', icon: 'eye' },
@@ -15,7 +28,17 @@ const STEPS = [
   { count: 1, sense: 'TASTE', prompt: 'Last one. What is 1 thing you can taste?', icon: 'taste' },
 ] as const;
 
+// Public export wraps the screen body in a forced-light ThemeProvider —
+// the grounding flow uses light surfaces / cards that don't invert well.
 export default function GroundScreen() {
+  return (
+    <ThemeProvider force="light">
+      <GroundScreenInner />
+    </ThemeProvider>
+  );
+}
+
+function GroundScreenInner() {
   const [stepIndex, setStepIndex] = useState(0);
   const [inputs, setInputs] = useState<string[]>([]);
   const [currentInput, setCurrentInput] = useState('');
@@ -73,54 +96,72 @@ export default function GroundScreen() {
   const remaining = step.count - inputs.length;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.closeButton}>
-          <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-            <Path d="M18 6L6 18M6 6l12 12" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" />
-          </Svg>
-        </Pressable>
-        <Text variant="bodyMedium">5-4-3-2-1 Grounding</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      {/* Progress dots */}
-      <View style={styles.progressRow}>
-        {STEPS.map((_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.progressDot,
-              i < stepIndex && styles.progressDotDone,
-              i === stepIndex && styles.progressDotActive,
-            ]}
-          />
-        ))}
-      </View>
-
-      <Animated.View style={[styles.mainContent, { opacity: fadeAnim }]}>
-        {/* Count circle */}
-        <View style={styles.countCircle}>
-          <Text variant="h1" style={{ fontSize: 48 }} color={Colors.primary}>{remaining}</Text>
-          <Text variant="label" color={Colors.primary}>{step.sense}</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.closeButton}>
+            <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+              <Path d="M18 6L6 18M6 6l12 12" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" />
+            </Svg>
+          </Pressable>
+          <Text variant="bodyMedium">5-4-3-2-1 Grounding</Text>
+          <View style={{ width: 24 }} />
         </View>
 
-        {/* Prompt */}
-        <Text variant="body" color={Colors.gray} style={styles.prompt}>
-          {step.prompt}
-        </Text>
-
-        {/* Entered items */}
-        <View style={styles.itemsContainer}>
-          {inputs.map((item, i) => (
-            <View key={i} style={styles.itemPill}>
-              <Text variant="caption" color={Colors.primaryDark}>{item}</Text>
-            </View>
+        {/* Progress dots */}
+        <View style={styles.progressRow}>
+          {STEPS.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.progressDot,
+                i < stepIndex && styles.progressDotDone,
+                i === stepIndex && styles.progressDotActive,
+              ]}
+            />
           ))}
         </View>
 
-        {/* Input */}
+        {/* Scrollable body so the input can rise above the keyboard
+            without clipping the count circle / prompt above it */}
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <Animated.View style={[styles.mainContent, { opacity: fadeAnim }]}>
+              {/* Count circle */}
+              <View style={styles.countCircle}>
+                <Text variant="h1" style={{ fontSize: 48 }} color={Colors.primary}>{remaining}</Text>
+                <Text variant="label" color={Colors.primary}>{step.sense}</Text>
+              </View>
+
+              {/* Prompt */}
+              <Text variant="body" color={Colors.gray} style={styles.prompt}>
+                {step.prompt}
+              </Text>
+
+              {/* Entered items */}
+              <View style={styles.itemsContainer}>
+                {inputs.map((item, i) => (
+                  <View key={i} style={styles.itemPill}>
+                    <Text variant="caption" color={Colors.primaryDark}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+            </Animated.View>
+          </TouchableWithoutFeedback>
+        </ScrollView>
+
+        {/* Input pinned to the bottom — KeyboardAvoidingView lifts this above
+            the keyboard so the user can always see what they're typing. */}
         <View style={styles.inputRow}>
           <TextInput
             style={styles.textInput}
@@ -130,11 +171,12 @@ export default function GroundScreen() {
             onChangeText={setCurrentInput}
             onSubmitEditing={handleAddItem}
             returnKeyType="done"
+            blurOnSubmit={false}
             autoFocus
           />
           <Button title="Add" variant="pill" onPress={handleAddItem} disabled={!currentInput.trim()} />
         </View>
-      </Animated.View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -144,6 +186,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  flex: { flex: 1 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -173,10 +216,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     width: 24,
   },
-  mainContent: {
-    flex: 1,
-    alignItems: 'center',
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
+    paddingVertical: Spacing.lg,
+  },
+  mainContent: {
+    alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     gap: Spacing.xl,
   },
@@ -211,7 +257,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    width: '100%',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.base,
+    backgroundColor: Colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#EAEAEA',
   },
   textInput: {
     flex: 1,

@@ -6,7 +6,9 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "clean:appledouble": "find . -name '._*' -type f -delete 2>/dev/null; true",
+    "postinstall": "npm run clean:appledouble"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
@@ -16,6 +18,7 @@
     "expo": "~54.0.33",
     "expo-apple-authentication": "~8.0.8",
     "expo-auth-session": "~7.0.10",
+    "expo-av": "~16.0.8",
     "expo-constants": "~18.0.13",
     "expo-crypto": "~15.0.8",
     "expo-dev-client": "~6.0.20",

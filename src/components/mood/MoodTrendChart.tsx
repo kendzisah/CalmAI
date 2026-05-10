@@ -2,6 +2,7 @@ import { View, StyleSheet } from 'react-native';
 import Svg, { Path, Circle, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { Text } from '@/components/ui';
 import { Colors, Spacing, Shadows } from '@/lib/constants';
+import { useThemeColors } from '@/theme';
 import type { MoodTrendPoint } from '@/types/mood';
 
 interface Props {
@@ -19,6 +20,7 @@ const moodToValue: Record<string, number> = {
 };
 
 export function MoodTrendChart({ data, days = 7, width = 300, height = 120 }: Props) {
+  const colors = useThemeColors();
   const padding = { top: 10, bottom: 10, left: 10, right: 10 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
@@ -54,14 +56,14 @@ export function MoodTrendChart({ data, days = 7, width = 300, height = 120 }: Pr
       <Svg width={width} height={height}>
         <Defs>
           <LinearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor={Colors.lavenderLight} stopOpacity={0.4} />
-            <Stop offset="100%" stopColor={Colors.lavenderLight} stopOpacity={0} />
+            <Stop offset="0%" stopColor={colors.lavenderLight} stopOpacity={0.4} />
+            <Stop offset="100%" stopColor={colors.lavenderLight} stopOpacity={0} />
           </LinearGradient>
         </Defs>
         <Path d={fillPath} fill="url(#fill)" />
-        <Path d={linePath} stroke={Colors.primary} strokeWidth={2.5} fill="none" strokeLinecap="round" />
+        <Path d={linePath} stroke={colors.primary} strokeWidth={2.5} fill="none" strokeLinecap="round" />
         {points.map((p, i) => (
-          <Circle key={i} cx={p.x} cy={p.y} r={3} fill={Colors.primary} />
+          <Circle key={i} cx={p.x} cy={p.y} r={3} fill={colors.primary} />
         ))}
       </Svg>
     </View>

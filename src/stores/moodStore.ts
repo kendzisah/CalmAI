@@ -13,6 +13,7 @@ interface MoodState {
   checkIn: (mood: MoodType, intensity?: number, context?: string, source?: MoodSource) => Promise<void>;
   getMonthlyCount: () => Promise<number>;
   getTrendData: (days: number) => Promise<MoodTrendPoint[]>;
+  reset: () => void;
 }
 
 export const useMoodStore = create<MoodState>((set, get) => ({
@@ -119,5 +120,15 @@ export const useMoodStore = create<MoodState>((set, get) => ({
 
     set({ trendData });
     return trendData;
+  },
+
+  reset: () => {
+    set({
+      currentMood: null,
+      todayCheckedIn: false,
+      monthlyCount: 0,
+      recentEntries: [],
+      trendData: [],
+    });
   },
 }));

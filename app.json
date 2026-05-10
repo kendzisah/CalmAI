@@ -2,27 +2,28 @@
   "expo": {
     "name": "CalmAI",
     "slug": "CalmAI",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/AppIcon-1024.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "scheme": "calmai",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/calmai-splash-art.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FAFAFA"
+      "backgroundColor": "#FFF8F0"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.calmai.app",
+      "bundleIdentifier": "com.flocktechnologies.calmai",
+      "icon": "./assets/AppIcon-1024.png",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.calmai.app",
+      "package": "com.flocktechnologies.calmai",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FAFAFA"

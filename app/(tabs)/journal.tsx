@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { Text, Card, Input, Button, Chip } from '@/components/ui';
 import { Colors, Spacing, Radius, MoodColors } from '@/lib/constants';
+import { useThemeColors } from '@/theme';
 import { MOOD_LABELS, MoodType } from '@/types/mood';
 import { useJournalStore, getRandomPrompt } from '@/stores/journalStore';
 import { usePaywall } from '@/hooks/usePaywall';
@@ -14,6 +15,7 @@ import { useMoodStore } from '@/stores/moodStore';
 const MOOD_TAG_SUBSET: MoodType[] = ['anxious', 'calm', 'overwhelmed', 'grateful'];
 
 export default function JournalScreen() {
+  const colors = useThemeColors();
   const [entryText, setEntryText] = useState('');
   const [selectedTags, setSelectedTags] = useState<MoodType[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -111,7 +113,7 @@ export default function JournalScreen() {
   const hasTodayEntry = !!todayEntry;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -119,34 +121,34 @@ export default function JournalScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerRow}>
-            <View style={styles.avatarCircle}>
+            <View style={[styles.avatarCircle, { backgroundColor: colors.primary }]}>
               <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
                 <Circle cx="12" cy="12" r="4" stroke="#FFFFFF" strokeWidth={2} />
                 <Circle cx="12" cy="12" r="9" stroke="#FFFFFF" strokeWidth={2} />
               </Svg>
             </View>
-            <Text variant="small" color={Colors.gray}>CalmAI</Text>
+            <Text variant="small" color={colors.textMuted}>CalmAI</Text>
           </View>
           <Text variant="h1">Your Space</Text>
-          <Text variant="body" color={Colors.gray}>
+          <Text variant="body" color={colors.textMuted}>
             Dump your thoughts here. No filter needed.
           </Text>
         </View>
 
         {/* Daily Reflection Card */}
-        <Card style={styles.promptCard}>
+        <Card style={[styles.promptCard, { backgroundColor: colors.surfaceMuted }]}>
           <View style={styles.promptLabel}>
             <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-              <Path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6L12 2z" fill={Colors.primary} />
+              <Path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6L12 2z" fill={colors.primary} />
             </Svg>
-            <Text variant="label" color={Colors.primary}>Today's Reflection</Text>
+            <Text variant="label" color={colors.primary}>Today's Reflection</Text>
           </View>
           <Text variant="h2" style={styles.promptText}>
             {`"${currentPrompt?.text || 'What made you feel safe today?'}"`}
           </Text>
           {isPro && !hasRefreshedPrompt && !hasTodayEntry && (
             <Pressable onPress={handleRefreshPrompt} style={styles.refreshButton}>
-              <Text variant="small" color={Colors.primary}>Give me a different one</Text>
+              <Text variant="small" color={colors.primary}>Give me a different one</Text>
             </Pressable>
           )}
         </Card>
@@ -161,14 +163,14 @@ export default function JournalScreen() {
             style={styles.entryInput}
           />
           <View style={styles.listeningRow}>
-            <View style={styles.listeningDot} />
-            <Text variant="small" color={Colors.gray}>This stays between us</Text>
+            <View style={[styles.listeningDot, { backgroundColor: colors.primary }]} />
+            <Text variant="small" color={colors.textMuted}>This stays between us</Text>
           </View>
         </View>
 
         {/* Mood Tags */}
         <View style={styles.tagsSection}>
-          <Text variant="label" color={Colors.gray}>Tag your mood</Text>
+          <Text variant="label" color={colors.textMuted}>Tag your mood</Text>
           <View style={styles.tagsRow}>
             {MOOD_TAG_SUBSET.map((mood) => (
               <Chip
@@ -176,7 +178,7 @@ export default function JournalScreen() {
                 label={MOOD_LABELS[mood]}
                 selected={selectedTags.includes(mood)}
                 backgroundColor={MoodColors[mood] + '40'}
-                selectedBackgroundColor={Colors.primary}
+                selectedBackgroundColor={colors.primary}
                 textColor={Colors.primaryDark}
                 selectedTextColor="#FFFFFF"
                 onPress={() => toggleTag(mood)}
@@ -200,7 +202,7 @@ export default function JournalScreen() {
               onPress={() => setShowHistory(!showHistory)}
             >
               <Text variant="bodyMedium">Past Entries</Text>
-              <Text variant="caption" color={Colors.primary}>
+              <Text variant="caption" color={colors.primary}>
                 {showHistory ? 'Hide' : `Show (${entries.length})`}
               </Text>
             </Pressable>
@@ -208,11 +210,11 @@ export default function JournalScreen() {
             {showHistory && entries.map((entry) => (
               <Pressable
                 key={entry.id}
-                style={styles.historyEntry}
+                style={[styles.historyEntry, { backgroundColor: colors.surface }]}
                 onLongPress={() => handleDeleteEntry(entry.id)}
               >
                 <View style={styles.historyHeader}>
-                  <Text variant="small" color={Colors.gray}>
+                  <Text variant="small" color={colors.textMuted}>
                     {new Date(entry.createdAt).toLocaleDateString(undefined, {
                       month: 'short', day: 'numeric', year: 'numeric',
                     })}
@@ -220,7 +222,7 @@ export default function JournalScreen() {
                   {entry.moodTags.length > 0 && (
                     <View style={styles.historyTags}>
                       {entry.moodTags.map((tag) => (
-                        <View key={tag} style={[styles.historyTag, { backgroundColor: MoodColors[tag] || Colors.grayLavender }]}>
+                        <View key={tag} style={[styles.historyTag, { backgroundColor: MoodColors[tag] || colors.grayLavender }]}>
                           <Text variant="small" color={Colors.primaryDark}>{MOOD_LABELS[tag]}</Text>
                         </View>
                       ))}
@@ -228,7 +230,7 @@ export default function JournalScreen() {
                   )}
                 </View>
                 {entry.promptText && (
-                  <Text variant="small" color={Colors.gray} style={{ fontStyle: 'italic' }}>
+                  <Text variant="small" color={colors.textMuted} style={{ fontStyle: 'italic' }}>
                     "{entry.promptText}"
                   </Text>
                 )}
@@ -245,7 +247,6 @@ export default function JournalScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scrollContent: {
     padding: Spacing.lg,
@@ -264,12 +265,10 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   promptCard: {
-    backgroundColor: '#F5F0FF',
     gap: Spacing.sm,
   },
   promptLabel: {
@@ -301,7 +300,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.primary,
   },
   tagsSection: {
     gap: Spacing.sm,
@@ -320,7 +318,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   historyEntry: {
-    backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     padding: Spacing.md,
     gap: Spacing.xs,

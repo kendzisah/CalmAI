@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import Purchases, { PurchasesPackage, CustomerInfo } from 'react-native-purchases';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { useAuthStore } from '@/stores/authStore';
+import { isPurchasesReady } from '@/lib/purchases';
 
 const ENTITLEMENT_ID = 'Calm AI Premium';
 
@@ -26,6 +27,7 @@ export function useSubscription() {
   };
 
   const checkEntitlements = useCallback(async () => {
+    if (!isPurchasesReady()) return;
     try {
       const customerInfo = await Purchases.getCustomerInfo();
       syncTier(customerInfo);
@@ -35,6 +37,7 @@ export function useSubscription() {
   }, [setTier]);
 
   const loadOfferings = useCallback(async () => {
+    if (!isPurchasesReady()) return;
     try {
       const offeringsResult = await Purchases.getOfferings();
       const current = offeringsResult.current;
@@ -50,6 +53,10 @@ export function useSubscription() {
   }, []);
 
   const purchasePackage = useCallback(async (pkg: PurchasesPackage | undefined) => {
+    if (!isPurchasesReady()) {
+      Alert.alert('Not Available', 'Purchases are not configured on this build.');
+      return;
+    }
     if (!pkg) {
       Alert.alert('Not Available', 'This plan is not available right now. Please try again later.');
       return;
@@ -77,6 +84,10 @@ export function useSubscription() {
   }, [offerings.annual, purchasePackage]);
 
   const restorePurchases = useCallback(async () => {
+    if (!isPurchasesReady()) {
+      Alert.alert('Not Available', 'Purchases are not configured on this build.');
+      return;
+    }
     try {
       setIsLoading(true);
       const customerInfo = await Purchases.restorePurchases();

@@ -1,12 +1,13 @@
 import { useRef, useEffect } from 'react';
 import { View, StyleSheet, Animated, Easing } from 'react-native';
-import { Colors, Spacing } from '@/lib/constants';
+import { Spacing } from '@/lib/constants';
+import { useThemeColors } from '@/theme';
 
 const DOT_SIZE = 8;
 const DOT_COUNT = 3;
 const STAGGER_DELAY = 300;
 
-function Dot({ index }: { index: number }) {
+function Dot({ index, color }: { index: number; color: string }) {
   const opacity = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
@@ -20,15 +21,16 @@ function Dot({ index }: { index: number }) {
     return () => { clearTimeout(timeout); animation.stop(); };
   }, [index, opacity]);
 
-  return <Animated.View style={[styles.dot, { opacity }]} />;
+  return <Animated.View style={[styles.dot, { opacity, backgroundColor: color }]} />;
 }
 
 export function TypingIndicator() {
+  const colors = useThemeColors();
   return (
     <View style={styles.row}>
-      <View style={styles.bubble}>
+      <View style={[styles.bubble, { backgroundColor: colors.aiBubbleBg }]}>
         {Array.from({ length: DOT_COUNT }).map((_, i) => (
-          <Dot key={i} index={i} />
+          <Dot key={i} index={i} color={colors.text} />
         ))}
       </View>
     </View>
@@ -42,7 +44,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.base,
   },
   bubble: {
-    backgroundColor: Colors.lavenderLight,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderBottomLeftRadius: 4,
@@ -57,6 +58,5 @@ const styles = StyleSheet.create({
     width: DOT_SIZE,
     height: DOT_SIZE,
     borderRadius: DOT_SIZE / 2,
-    backgroundColor: Colors.primaryDark,
   },
 });

@@ -1,21 +1,27 @@
-import { TextInput, StyleSheet, TextInputProps, View } from 'react-native';
-import { Colors, Radius, Spacing, Typography } from '@/lib/constants';
+import { TextInput, StyleSheet, TextInputProps } from 'react-native';
+import { Radius, Spacing } from '@/lib/constants';
+import { useThemeColors } from '@/theme';
 
 interface Props extends TextInputProps {
   multiline?: boolean;
 }
 
 export function Input({ multiline = false, style, ...props }: Props) {
+  const colors = useThemeColors();
   return (
     <TextInput
       style={[
         styles.base,
+        {
+          backgroundColor: colors.surfaceMuted,
+          color: colors.text,
+        },
         multiline && styles.multiline,
         style,
       ]}
       multiline={multiline}
-      placeholderTextColor={Colors.gray}
-      selectionColor={Colors.primary}
+      placeholderTextColor={colors.textMuted}
+      selectionColor={colors.primary}
       scrollEnabled={multiline}
       {...props}
     />
@@ -24,12 +30,10 @@ export function Input({ multiline = false, style, ...props }: Props) {
 
 const styles = StyleSheet.create({
   base: {
-    backgroundColor: Colors.background,
     borderRadius: Radius.md,
     padding: Spacing.base,
     fontFamily: 'Inter-Regular',
     fontSize: 16,
-    color: Colors.primaryDark,
     lineHeight: 24,
   },
   multiline: {

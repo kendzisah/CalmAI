@@ -1,31 +1,57 @@
 import { useEffect, useCallback } from 'react';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
-import Purchases from 'react-native-purchases';
+import { safePurchasesLogIn } from '@/lib/purchases';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { restoreFromCloud } from '@/services/syncService';
+import { resetLocalUserData } from '@/services/resetService';
+
+// Tracks the last user ID we saw an auth event for, so we can detect when a
+// session arrives for a different account and wipe local data before that
+// account's screens get a chance to read stale rows from SQLite.
+const LAST_USER_ID_KEY = 'calmai.lastUserId';
 
 export function useAuth() {
   const { userId, email, isAnonymous, isAuthenticated, setUser, setAnonymous, signOut: clearAuth } = useAuthStore();
 
   useEffect(() => {
-    const onUserAuthenticated = async (userId: string, isAnon: boolean) => {
-      try {
-        await Purchases.logIn(userId);
-      } catch {
-        // Non-critical — purchases still work on-device
+    // Side effects (RevenueCat login, cloud restore) are deferred to the next
+    // event-loop tick so the AsyncStorage session write triggered by signUp /
+    // signInWithPassword has time to flush before any consumer queries it.
+    // Without this, race conditions between the SIGNED_IN listener and the
+    // pending storage write surface as opaque "Auth session missing!" errors.
+    const onUserAuthenticated = (uid: string, isAnon: boolean) => {
+      setTimeout(async () => {
+        await safePurchasesLogIn(uid);
+        if (!isAnon) {
+          restoreFromCloud().catch((e) =>
+            console.warn('[useAuth] restoreFromCloud failed:', e?.message)
+          );
+        }
+      }, 0);
+    };
+
+    // If a session arrives for a user that differs from the last one we saw,
+    // the previous account's data is still sitting in SQLite. Wipe it before
+    // the tabs get a chance to render — this is the safety net for any path
+    // that swaps users without a full signOut() in between.
+    const handleSession = async (uid: string) => {
+      const lastUserId = await AsyncStorage.getItem(LAST_USER_ID_KEY);
+      if (lastUserId && lastUserId !== uid) {
+        await resetLocalUserData();
       }
-      if (!isAnon) {
-        restoreFromCloud().catch(() => {});
-      }
+      await AsyncStorage.setItem(LAST_USER_ID_KEY, uid);
     };
 
     // Check existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log('[useAuth] initial getSession ->', session ? 'session' : 'no session');
       if (session?.user) {
         const isAnon = !session.user.email;
+        await handleSession(session.user.id);
         if (isAnon) {
           setAnonymous(session.user.id);
         } else {
@@ -36,9 +62,11 @@ export function useAuth() {
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[useAuth] onAuthStateChange ->', event, '| session?', !!session);
       if (session?.user) {
         const isAnon = !session.user.email;
+        await handleSession(session.user.id);
         if (isAnon) {
           setAnonymous(session.user.id);
         } else {
@@ -60,11 +88,6 @@ export function useAuth() {
 
   const signUpWithEmail = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password });
-    if (error) throw error;
-  }, []);
-
-  const signInAnonymously = useCallback(async () => {
-    const { error } = await supabase.auth.signInAnonymously();
     if (error) throw error;
   }, []);
 
@@ -95,38 +118,28 @@ export function useAuth() {
     if (error) throw error;
   }, []);
 
-  const signInWithGoogle = useCallback(async () => {
-    // Google Sign-In requires @react-native-google-signin/google-signin
-    // and a Google Cloud OAuth client ID. For now, fall back to OAuth redirect.
-    // This will work in development builds with deep linking configured.
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: 'calmai://auth/callback',
-      },
-    });
-    if (error) throw error;
-  }, []);
-
   const signOut = useCallback(async () => {
+    // Wipe local state BEFORE clearing the Supabase session — once the session
+    // is gone, the auth listener fires with `session: null` and nothing in the
+    // app can authenticate to flush anything anyway. Clearing first means the
+    // next user (whoever they are) starts on a clean device.
+    await resetLocalUserData();
+    await AsyncStorage.removeItem(LAST_USER_ID_KEY);
     await supabase.auth.signOut();
     clearAuth();
   }, [clearAuth]);
 
+  // Used by profile.tsx for legacy anonymous accounts created before the
+  // onboarding required sign-in upfront. New users no longer hit this path,
+  // but existing anonymous users still need a way to upgrade to a real account.
   const migrateAnonymousAccount = useCallback(async (email: string, password: string) => {
-    // Convert anonymous user to a real account
     const { error } = await supabase.auth.updateUser({ email, password });
     if (error) throw error;
 
-    // Re-link RevenueCat so subscriptions follow the account
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
       setUser(session.user.id, session.user.email || null, false);
-      try {
-        await Purchases.logIn(session.user.id);
-      } catch {
-        // Non-critical
-      }
+      await safePurchasesLogIn(session.user.id);
     }
   }, [setUser]);
 
@@ -137,9 +150,7 @@ export function useAuth() {
     isAuthenticated,
     signInWithEmail,
     signUpWithEmail,
-    signInAnonymously,
     signInWithApple,
-    signInWithGoogle,
     signOut,
     migrateAnonymousAccount,
   };
