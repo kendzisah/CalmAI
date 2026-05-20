@@ -6,7 +6,7 @@ import { GradientBackground, Text, Button } from '@/components/ui';
 import { ChatMockup } from '@/components/onboarding/ChatMockup';
 import { TestimonialPull } from '@/components/onboarding/TestimonialPull';
 import { useOnboardingStore } from '@/stores/onboardingStore';
-import { Colors, Spacing, Radius } from '@/lib/constants';
+import { Colors, Spacing } from '@/lib/constants';
 import { track } from '@/lib/analytics';
 import { MOCKUPS, selectMockup } from '@/data/proofMockups';
 import { pickTestimonial } from '@/data/testimonials';
@@ -60,10 +60,6 @@ export default function ProofScreen() {
             Here's what tonight could look like —
           </Text>
 
-          <View style={styles.sampleBadge}>
-            <Text variant="small" color={Colors.gray}>Sample preview</Text>
-          </View>
-
           <ChatMockup
             userMessage={mockup.user}
             aiMessage={mockup.responses[tone]}
@@ -71,9 +67,6 @@ export default function ProofScreen() {
           />
 
           <TestimonialPull testimonial={testimonial} />
-          <Text variant="small" color={Colors.gray} style={styles.sampleNote}>
-            Sample testimonial — real beta-user quotes coming before launch.
-          </Text>
         </ScrollView>
 
         <View style={styles.footer}>
@@ -96,17 +89,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  sampleBadge: {
-    alignSelf: 'center',
-    backgroundColor: Colors.grayLavender,
-    borderRadius: Radius.pill,
-    paddingVertical: 4,
-    paddingHorizontal: Spacing.md,
-  },
-  sampleNote: {
-    textAlign: 'center',
-    fontStyle: 'italic',
   },
   footer: {
     paddingHorizontal: Spacing.lg,

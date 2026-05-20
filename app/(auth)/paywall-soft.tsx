@@ -138,12 +138,6 @@ export default function PaywallSoftScreen() {
             </Text>
           </View>
 
-          <View style={styles.previewLabelWrap}>
-            <Text variant="small" color={Colors.gray} style={styles.previewLabel}>
-              A real preview — sessions like yours
-            </Text>
-          </View>
-
           <ChatMockup
             userMessage={conversation.user}
             aiMessage={aiMessage}
@@ -297,15 +291,6 @@ const styles = StyleSheet.create({
     lineHeight: 38,
   },
   subtitle: { textAlign: 'center' },
-  previewLabelWrap: {
-    alignSelf: 'center',
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-  },
-  previewLabel: {
-    fontStyle: 'italic',
-    letterSpacing: 0.2,
-  },
   trustStrip: {
     flexDirection: 'row',
     flexWrap: 'wrap',

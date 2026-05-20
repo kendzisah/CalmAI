@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="index, follow" />
+  <title>Privacy Policy — CalmAI</title>
+  <meta name="description" content="CalmAI Privacy Policy — what we collect, why, who we share it with, and how to control your data." />
+  <style>
+    :root {
+      --bg: #FFF8F0;
+      --surface: #FFFFFF;
+      --ink: #1F1733;
+      --ink-soft: #4B4360;
+      --muted: #6B6479;
+      --primary: #7C5CBF;
+      --primary-dark: #5A3F94;
+      --rule: rgba(124, 92, 191, 0.18);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 56px 24px 96px;
+    }
+    .eyebrow {
+      display: inline-block;
+      font-size: 12px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--primary);
+      background: rgba(124, 92, 191, 0.10);
+      padding: 6px 12px;
+      border-radius: 999px;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+    h1 {
+      font-size: 36px;
+      line-height: 1.15;
+      margin: 0 0 12px;
+      letter-spacing: -0.5px;
+    }
+    .effective {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0 0 32px;
+    }
+    h2 {
+      font-size: 22px;
+      line-height: 1.3;
+      margin: 40px 0 12px;
+      color: var(--primary-dark);
+    }
+    h3 {
+      font-size: 17px;
+      margin: 24px 0 8px;
+      color: var(--ink);
+    }
+    p, li { color: var(--ink-soft); }
+    a { color: var(--primary); text-decoration: underline; }
+    a:hover { color: var(--primary-dark); }
+    ul { padding-left: 22px; }
+    li { margin: 6px 0; }
+    .callout {
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-left: 3px solid var(--primary);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 24px 0;
+    }
+    .callout p { margin: 0; color: var(--ink); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      background: var(--surface);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--rule);
+    }
+    th, td {
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--rule);
+      font-size: 14px;
+      vertical-align: top;
+    }
+    th { background: rgba(124, 92, 191, 0.06); font-weight: 600; color: var(--primary-dark); }
+    tr:last-child td { border-bottom: none; }
+    .footer {
+      margin-top: 56px;
+      padding-top: 24px;
+      border-top: 1px solid var(--rule);
+      font-size: 13px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <span class="eyebrow">CalmAI</span>
+    <h1>Privacy Policy</h1>
+    <p class="effective">Effective: May 19, 2026</p>
+
+    <div class="callout">
+      <p><strong>The short version:</strong> CalmAI is a non-clinical companion app. We collect what we need to make the experience personal and remember your conversations across devices. We never sell your data. You can export or delete it from inside the app at any time.</p>
+    </div>
+
+    <p>This Privacy Policy describes how <strong>Flock Technologies</strong> ("CalmAI," "we," "us," or "our") collects, uses, and shares information when you use the CalmAI mobile application and related services (the "Service"). By using the Service, you agree to the practices described here.</p>
+
+    <p>CalmAI is <strong>not a medical service</strong>, not a substitute for therapy, and not a crisis line. If you are in crisis, please use the "Find support" link inside the app or contact a local emergency service.</p>
+
+    <h2>1. Who this policy applies to</h2>
+    <p>This policy applies to everyone who downloads, installs, or interacts with CalmAI. You must be at least 18 years old to use the Service. We do not knowingly collect information from anyone under 18 — if you believe a child has provided us information, contact us and we will delete it.</p>
+
+    <h2>2. What we collect</h2>
+
+    <h3>2.1 Information you give us</h3>
+    <ul>
+      <li><strong>Account details</strong> — email address (if you create an account) and authentication tokens from Supabase, our auth provider.</li>
+      <li><strong>Onboarding answers</strong> — your nickname, what's loud for you (e.g. work, relationships, money), when anxiety hits, what helps, and your preferred tone. These are used to personalize replies.</li>
+      <li><strong>Chat messages</strong> — what you type to CalmAI, and what CalmAI replies. Stored to provide conversation memory across sessions.</li>
+      <li><strong>Journal entries and mood check-ins</strong> — text, tags, and timestamps you save in the Journal and mood features.</li>
+      <li><strong>Subscription state</strong> — whether you have an active trial or paid subscription, sourced from RevenueCat and the Apple App Store. We never receive your full payment card details.</li>
+    </ul>
+
+    <h3>2.2 Information we collect automatically</h3>
+    <ul>
+      <li><strong>Device and app data</strong> — device type, OS version, app version, language, time zone, and crash diagnostics.</li>
+      <li><strong>Usage events</strong> — anonymized product events (e.g. "paywall_viewed", "chat_message_sent") used to improve the product. No event payload contains chat or journal content.</li>
+      <li><strong>Notification token</strong> — if you grant push permission, we store the Expo push token so we can deliver the daily check-in reminder you opted into.</li>
+    </ul>
+
+    <h3>2.3 What we do <em>not</em> collect</h3>
+    <ul>
+      <li>We do not collect precise location.</li>
+      <li>We do not collect contacts, photos, microphone, or biometric data.</li>
+      <li>We do not collect advertising identifiers and we do not run third-party ads.</li>
+    </ul>
+
+    <h2>3. How we use your information</h2>
+    <ul>
+      <li>To personalize CalmAI's responses to your tone, triggers, and coping preferences.</li>
+      <li>To remember conversation context across sessions and devices.</li>
+      <li>To check messages for crisis content so we can surface emergency resources when needed.</li>
+      <li>To process subscriptions, trials, restores, and billing through Apple and RevenueCat.</li>
+      <li>To send notifications you have explicitly opted into.</li>
+      <li>To diagnose crashes and improve product quality and reliability.</li>
+      <li>To detect abuse and enforce the Terms of Use.</li>
+    </ul>
+
+    <h2>4. AI processing — important specifics</h2>
+    <p>CalmAI uses large language models from <strong>OpenAI</strong> to generate replies. When you send a message:</p>
+    <ul>
+      <li>Your message content and the recent conversation history (up to the last 10 messages) are sent to OpenAI to generate a response.</li>
+      <li>Your onboarding profile (nickname, loud categories, trigger times, coping preferences, tone) is included in the system prompt so replies stay personalized.</li>
+      <li>OpenAI's Moderation API is also called against your message to detect crisis content. If self-harm content is detected, CalmAI replaces the model reply with a safety message pointing you to local crisis resources.</li>
+      <li>Per our agreement with OpenAI, your inputs and outputs are <strong>not used to train OpenAI's models</strong>.</li>
+    </ul>
+
+    <h2>5. Service providers we share data with</h2>
+    <p>We share the minimum data needed with the following providers, each bound by a data processing agreement and acting only on our instructions:</p>
+    <table>
+      <thead><tr><th>Provider</th><th>Purpose</th><th>Data shared</th></tr></thead>
+      <tbody>
+        <tr><td>Supabase</td><td>Authentication, database, and file storage</td><td>Email, account ID, onboarding profile, chat history, journal entries, mood entries</td></tr>
+        <tr><td>OpenAI</td><td>Chat completion and content moderation</td><td>Message content, recent history, profile fields used in the system prompt</td></tr>
+        <tr><td>RevenueCat</td><td>Subscription management and entitlement checks</td><td>Anonymized user ID, subscription state, product identifiers</td></tr>
+        <tr><td>Apple App Store</td><td>Billing, payment, refunds, receipts</td><td>Handled directly by Apple under their privacy policy</td></tr>
+        <tr><td>Expo</td><td>Push notification delivery and crash reporting</td><td>Push token, device metadata, crash stack traces</td></tr>
+      </tbody>
+    </table>
+    <p>We do <strong>not</strong> sell your personal information, and we do not share it with advertisers or data brokers.</p>
+
+    <h2>6. Legal disclosures</h2>
+    <p>We may disclose information if we believe in good faith that it is required by law, by a valid legal process, or to protect the rights, safety, or property of Flock Technologies, our users, or the public — for example in response to a verified court order or subpoena. We will challenge over-broad requests where appropriate and notify users where legally permitted.</p>
+
+    <h2>7. How long we keep data</h2>
+    <ul>
+      <li><strong>Chat messages, journal entries, mood entries</strong> — retained for as long as your account is active so the experience stays continuous. Deleted within 30 days of account deletion.</li>
+      <li><strong>Onboarding profile</strong> — retained while your account is active; deleted on account deletion.</li>
+      <li><strong>Subscription records</strong> — retained for the period required by tax, accounting, and consumer-protection law (typically up to 7 years), even after account deletion.</li>
+      <li><strong>Anonymized analytics events</strong> — retained in aggregate form indefinitely; they cannot be re-linked to your account after deletion.</li>
+    </ul>
+
+    <h2>8. Your rights and controls</h2>
+    <p>You can exercise the following rights from inside the app on the Profile tab, or by emailing us:</p>
+    <ul>
+      <li><strong>Access and export</strong> — request a copy of the personal data we hold about you.</li>
+      <li><strong>Correction</strong> — update your nickname, profile answers, and tone preferences directly in the app.</li>
+      <li><strong>Deletion</strong> — delete your account. This wipes your chats, journal, mood data, and profile within 30 days. Subscription receipts retained for legal reasons are excluded.</li>
+      <li><strong>Withdraw consent</strong> — turn off notifications, or stop using the Service at any time.</li>
+      <li><strong>Lodge a complaint</strong> — if you are in the EEA / UK, you have the right to complain to your local data protection authority.</li>
+    </ul>
+
+    <h2>9. EU / UK users (GDPR)</h2>
+    <p>If you are in the EEA, UK, or Switzerland, the legal bases we rely on are:</p>
+    <ul>
+      <li><strong>Contract</strong> — to provide the Service you signed up for.</li>
+      <li><strong>Consent</strong> — for notifications and any optional features you opt into.</li>
+      <li><strong>Legitimate interests</strong> — for product analytics, security, and abuse prevention, balanced against your rights.</li>
+      <li><strong>Legal obligation</strong> — to comply with tax, accounting, and law-enforcement requirements.</li>
+    </ul>
+    <p>Data may be transferred to and processed in the United States. We rely on Standard Contractual Clauses and equivalent safeguards for such transfers.</p>
+
+    <h2>10. California users (CCPA / CPRA)</h2>
+    <p>California residents have the right to know what personal information we collect, request deletion, correct inaccurate information, and not be discriminated against for exercising these rights. We do not sell personal information and do not "share" it for cross-context behavioral advertising. To exercise your rights, email us using the contact below.</p>
+
+    <h2>11. Security</h2>
+    <p>We use TLS for data in transit, encrypted storage at rest, role-based access controls, and audit logging. No system is perfectly secure — if we discover a breach affecting your personal data, we will notify you and the relevant authorities as required by law.</p>
+
+    <h2>12. Children</h2>
+    <p>CalmAI is intended for adults 18 and older. We do not knowingly collect data from minors. If we learn that we have, we will delete the data promptly.</p>
+
+    <h2>13. Changes to this policy</h2>
+    <p>We may update this policy from time to time. When we make material changes, we will update the "Effective" date at the top and, where appropriate, notify you in the app before the change takes effect.</p>
+
+    <h2>14. Contact us</h2>
+    <p>Questions, requests, or complaints? Email <a href="mailto:privacy@flocktechnologies.com">privacy@flocktechnologies.com</a>.</p>
+
+    <div class="footer">
+      <p>© Flock Technologies. CalmAI is a product of Flock Technologies. This page is the official privacy policy for the CalmAI app.</p>
+    </div>
+  </main>
+</body>
+</html>

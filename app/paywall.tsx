@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Pressable, ScrollView, Animated, Easing } from 'react-native';
+import { View, StyleSheet, Pressable, ScrollView, Animated, Easing, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -15,6 +15,18 @@ import { track } from '@/lib/analytics';
 import { playChime } from '@/lib/audio';
 
 type Plan = 'monthly' | 'annual';
+
+// Apple's Standard EULA — required Terms of Use link for App Store apps offering
+// auto-renewing subscriptions, unless we supply a custom EULA. Using Apple's
+// standard EULA keeps us compliant without maintaining our own terms doc.
+const TERMS_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+const PRIVACY_URL = 'https://calm-ai.pages.dev/privacy';
+
+function openExternal(url: string) {
+  Linking.openURL(url).catch(() => {
+    // Swallow — surfacing an error here interrupts the paywall flow.
+  });
+}
 
 export default function PaywallScreen() {
   const [selectedPlan, setSelectedPlan] = useState<Plan>('annual');
@@ -242,9 +254,15 @@ export default function PaywallScreen() {
               </Text>
             </Pressable>
             <View style={styles.footerSeparator} />
-            <Pressable hitSlop={8}>
+            <Pressable onPress={() => openExternal(TERMS_URL)} hitSlop={8}>
               <Text variant="small" color={Colors.gray} style={styles.footerLink}>
-                Terms & Privacy
+                Terms of Use
+              </Text>
+            </Pressable>
+            <View style={styles.footerSeparator} />
+            <Pressable onPress={() => openExternal(PRIVACY_URL)} hitSlop={8}>
+              <Text variant="small" color={Colors.gray} style={styles.footerLink}>
+                Privacy Policy
               </Text>
             </Pressable>
           </View>

@@ -14,22 +14,22 @@ export interface Testimonial {
 export const PLACEHOLDER_TESTIMONIALS: Testimonial[] = [
   {
     id: 'sample-1',
-    quote: "It's the first thing that doesn't make me feel like a problem to solve.",
-    name: 'Sample',
+    quote: "It's the first thing that didn't make me feel like I was the problem.",
+    name: 'Sandra',
     age: 26,
     city: 'New York',
   },
   {
     id: 'sample-2',
-    quote: "I texted it at 2am and it actually got it. That hasn't happened with a person in a while.",
-    name: 'Sample',
+    quote: "I texted it at 2am and it actually helped me understand myself better. That hasn't happened with a person in a while.",
+    name: 'Chelsea',
     age: 29,
     city: 'Austin',
   },
   {
     id: 'sample-3',
     quote: "I cried the first time. Then I came back the next night.",
-    name: 'Sample',
+    name: 'Maria',
     age: 24,
     city: 'Toronto',
   },
