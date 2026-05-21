@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
+import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { Text, Card, Input, Button, Chip } from '@/components/ui';
@@ -11,6 +12,7 @@ import { usePaywall } from '@/hooks/usePaywall';
 import { useSubscription } from '@/hooks/useSubscription';
 import { fetchJournalPrompt } from '@/services/chatService';
 import { useMoodStore } from '@/stores/moodStore';
+import { track } from '@/lib/analytics';
 
 const MOOD_TAG_SUBSET: MoodType[] = ['anxious', 'calm', 'overwhelmed', 'grateful'];
 
@@ -28,6 +30,13 @@ export default function JournalScreen() {
   const { currentMood } = useMoodStore();
   const { guardJournal } = usePaywall();
   const { isPro } = useSubscription();
+
+  // Subscription gate. Non-Pro users get pushed to the paywall on mount.
+  useEffect(() => {
+    if (!isPro) {
+      router.replace('/paywall');
+    }
+  }, [isPro]);
 
   useEffect(() => {
     loadEntries();
@@ -85,13 +94,20 @@ export default function JournalScreen() {
     const allowed = await guardJournal();
     if (!allowed) return;
 
-    if (todayEntry) {
+    const isUpdate = !!todayEntry;
+    if (isUpdate) {
       // Update existing entry for today
       await updateTodayEntry(entryText, selectedTags);
     } else {
       // Create new entry
       await saveEntry(entryText, selectedTags, currentPrompt?.text, !!currentPrompt);
     }
+    track('journal_entry_saved', {
+      entry_length: entryText.trim().length,
+      tag_count: selectedTags.length,
+      has_prompt: !!currentPrompt,
+      is_update: isUpdate,
+    });
   };
 
   const handleDeleteEntry = (id: string) => {
@@ -179,7 +195,7 @@ export default function JournalScreen() {
                 selected={selectedTags.includes(mood)}
                 backgroundColor={MoodColors[mood] + '40'}
                 selectedBackgroundColor={colors.primary}
-                textColor={Colors.primaryDark}
+                textColor={colors.text}
                 selectedTextColor="#FFFFFF"
                 onPress={() => toggleTag(mood)}
               />

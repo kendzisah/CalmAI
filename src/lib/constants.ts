@@ -98,12 +98,3 @@ export const BreathingConfig = {
   defaultCycles: 4,
   miniCycles: 2, // for onboarding relief
 } as const;
-
-// Freemium limits
-export const FreeLimits = {
-  aiSessionsPerWeek: 3,
-  messagesPerSession: 15,
-  proMessagesPerSession: 30,
-  journalEntriesLifetime: 7,
-  moodTrendDaysFree: 7,
-} as const;

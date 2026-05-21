@@ -14,10 +14,9 @@ import { supabase } from '@/lib/supabase';
 import { useTheme, useThemeColors } from '@/theme';
 import type { ThemePreference } from '@/theme';
 import {
-  cancelDailyReminder,
   getNotificationPermission,
-  requestNotificationPermission,
-  scheduleDailyReminder,
+  registerForServerPush,
+  unregisterFromServerPush,
 } from '@/lib/notifications';
 
 function formatHourLabel(hour: number): string {
@@ -155,18 +154,18 @@ export default function ProfileScreen() {
   }, [isPro]);
 
   // --- Notifications ---
-  // Tapping the row opens a bottom-sheet picker; the user picks an hour
-  // (which also enables notifications) or removes the reminder. All scheduling
-  // routes through the shared `notifications.ts` helper so the daily reminder
-  // logic (tone-aware copy, single identifier so we never schedule duplicates)
-  // is consistent with onboarding.
+  // Tapping the row opens a bottom-sheet picker. The user picks an hour
+  // (which also enables notifications) or removes the reminder. Server-side
+  // cron handles delivery, so updates flow through registerForServerPush and
+  // unregisterFromServerPush, which write the push token, timezone, and hour
+  // onto public.users.
   const handleNotificationsPress = useCallback(() => {
     setShowNotifPicker(true);
   }, []);
 
   const handlePickReminderHour = useCallback(async (hour: number) => {
-    const granted = await requestNotificationPermission();
-    if (!granted) {
+    const registered = await registerForServerPush({ hour, nickname, tonePref });
+    if (!registered) {
       setShowNotifPicker(false);
       Alert.alert(
         'Permission Needed',
@@ -174,14 +173,13 @@ export default function ProfileScreen() {
       );
       return;
     }
-    await scheduleDailyReminder({ hour, nickname, tonePref });
     await setSuggestedNotificationHour(hour);
     await setNotificationsEnabled(true);
     setShowNotifPicker(false);
   }, [nickname, tonePref, setSuggestedNotificationHour, setNotificationsEnabled]);
 
   const handleRemoveReminder = useCallback(async () => {
-    await cancelDailyReminder();
+    await unregisterFromServerPush();
     await setNotificationsEnabled(false);
     setShowNotifPicker(false);
   }, [setNotificationsEnabled]);

@@ -19,6 +19,8 @@ import * as Haptics from 'expo-haptics';
 import { Text, Button } from '@/components/ui';
 import { Colors, Spacing, Radius } from '@/lib/constants';
 import { ThemeProvider } from '@/theme';
+import { useEffect } from 'react';
+import { track } from '@/lib/analytics';
 
 const STEPS = [
   { count: 5, sense: 'SEE', prompt: 'Look around. What are 5 things you can see?', icon: 'eye' },
@@ -44,6 +46,14 @@ function GroundScreenInner() {
   const [currentInput, setCurrentInput] = useState('');
   const [isComplete, setIsComplete] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    track('ground_started');
+  }, []);
+
+  useEffect(() => {
+    if (isComplete) track('ground_completed', { steps_completed: STEPS.length });
+  }, [isComplete]);
 
   const step = STEPS[stepIndex];
 

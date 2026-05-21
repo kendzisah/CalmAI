@@ -21,6 +21,10 @@ export function FindSupportSheet({ visible, onClose }: Props) {
     } catch {
       // openBrowserAsync rejects if already open or unsupported — silently no-op.
     }
+    // Fire dismissed on the find-path too so the sheet's lifecycle is symmetric.
+    // Lets PostHog compute (taps / dismisses) without missing the auto-dismiss
+    // case where the user tapped through to the browser.
+    track('support_sheet_dismissed');
     onClose();
   };
 

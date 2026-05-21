@@ -17,6 +17,7 @@ import {
 } from '@/lib/breathingAudio';
 import { useBreathingAudioStore } from '@/stores/breathingAudioStore';
 import { ThemeProvider } from '@/theme';
+import { track } from '@/lib/analytics';
 
 // Public export wraps the screen body in a forced-light ThemeProvider.
 // The breathing experience uses a bold lavender background that doesn't
@@ -51,11 +52,20 @@ function BreatheScreenInner() {
     hydrateMute();
     preloadBreathingAudio();
     start(4, 'box');
+    track('breathe_started', { pattern: 'box', cycles_target: 4 });
     return () => {
       reset();
       stopBreathingAudio();
     };
   }, []);
+
+  // Fires once when the user actually reaches the completion screen — separate
+  // from breathe_started so PostHog can compute a completion rate per session.
+  useEffect(() => {
+    if (isComplete) {
+      track('breathe_completed', { pattern: 'box', cycles_completed: totalCycles });
+    }
+  }, [isComplete, totalCycles]);
 
   // Play the appropriate sound at the start of each inhale/exhale phase.
   // hold1 / hold2 are intentionally silent.

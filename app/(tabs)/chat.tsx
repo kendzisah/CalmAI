@@ -11,10 +11,12 @@ import { useThemeColors } from '@/theme';
 import { useChatStore } from '@/stores/chatStore';
 import { usePaywall } from '@/hooks/usePaywall';
 import { detectCrisis } from '@/utils/crisisDetection';
-import { sendChatMessage } from '@/services/chatService';
+import { sendChatMessage, fetchAiOpener } from '@/services/chatService';
 import { useOnboardingStore } from '@/stores/onboardingStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useSubscription } from '@/hooks/useSubscription';
 import { buildFirstMessage } from '@/lib/firstMessage';
+import { getCachedOpener, setCachedOpener } from '@/lib/openerCache';
 import { track } from '@/lib/analytics';
 import type { ChatMessage } from '@/types/chat';
 
@@ -34,7 +36,9 @@ export default function ChatScreen() {
   const addUserMessage = useChatStore((s) => s.addUserMessage);
   const addAssistantMessage = useChatStore((s) => s.addAssistantMessage);
   const setQuickReplies = useChatStore((s) => s.setQuickReplies);
+  const getLifetimeSessionCount = useChatStore((s) => s.getLifetimeSessionCount);
   const { guardChat } = usePaywall();
+  const { isPro } = useSubscription();
   const onboarding = useOnboardingStore();
   const { isAuthenticated, isAnonymous } = useAuthStore();
   const _needsAccount = !isAuthenticated || isAnonymous;
@@ -44,6 +48,19 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
   const seededRef = useRef(false);
+  // Tracks whether we've already fired crisis_detected for the current session
+  // so the event doesn't double-fire if a user keeps sending flagged messages
+  // back-to-back. Per-session dedupe matches how the banner persists.
+  const crisisFiredRef = useRef(false);
+
+  // Subscription gate. Non-Pro users get pushed to the paywall on mount.
+  // Server-side chat-completion also returns 402, so this UI block is the
+  // first line of defense and prevents a blank chat from rendering.
+  useEffect(() => {
+    if (!isPro) {
+      router.replace('/paywall');
+    }
+  }, [isPro]);
 
   useEffect(() => {
     if (!currentSession) {
@@ -52,22 +69,68 @@ export default function ChatScreen() {
   }, []);
 
   // Seed the personalized first message once per session.
+  // CalmAI is subscription-only, so every user who reaches the seed path is
+  // Pro. Returning users get an AI-generated opener based on recent history,
+  // cached once per calendar day. The very first conversation falls back to
+  // the static personalized intro in firstMessage.ts because the AI has no
+  // prior history to reference yet.
   useEffect(() => {
     if (!currentSession || seededRef.current) return;
     if (messages.length > 0) {
       seededRef.current = true;
       return;
     }
-    const opener = buildFirstMessage({
-      nickname: onboarding.nickname,
-      loudCategories: onboarding.loudCategories,
-      triggerTimes: onboarding.triggerTimes,
-      tonePref: onboarding.tonePref,
-    });
-    addAssistantMessage(opener).catch(() => {});
+    if (!isPro) return;
     seededRef.current = true;
-    track('chat_first_message_replied');
-  }, [currentSession, messages.length]);
+    (async () => {
+      let previousSessionCount = 0;
+      try {
+        const total = await getLifetimeSessionCount();
+        previousSessionCount = Math.max(0, total - 1);
+      } catch {
+        // Count query failed. Default to first-ever copy.
+      }
+
+      const staticOpener = buildFirstMessage({
+        nickname: onboarding.nickname,
+        loudCategories: onboarding.loudCategories,
+        triggerTimes: onboarding.triggerTimes,
+        tonePref: onboarding.tonePref,
+        previousSessionCount,
+      });
+
+      const isFirstEver = previousSessionCount === 0;
+
+      let opener = staticOpener;
+      if (!isFirstEver) {
+        try {
+          const cached = await getCachedOpener();
+          if (cached) {
+            opener = cached;
+          } else {
+            const ai = await fetchAiOpener({
+              nickname: onboarding.nickname ?? undefined,
+              loudCategories: onboarding.loudCategories,
+              triggerTimes: onboarding.triggerTimes,
+              copingPrefs: onboarding.copingPrefs,
+              tonePref: onboarding.tonePref ?? undefined,
+            });
+            if (ai) {
+              opener = ai;
+              setCachedOpener(ai, 'ai').catch(() => {});
+            } else {
+              setCachedOpener(staticOpener, 'static').catch(() => {});
+            }
+          }
+        } catch {
+          // AI or cache layer failed. The static opener already covers this path.
+        }
+      }
+
+      addAssistantMessage(opener).catch(() => {});
+      track('chat_first_message_replied');
+    })();
+  }, [currentSession, messages.length, isPro]);
 
   const handleSend = useCallback(async (text?: string) => {
     const messageText = (text || inputText).trim();
@@ -78,14 +141,29 @@ export default function ChatScreen() {
 
     if (detectCrisis(messageText)) {
       setShowCrisisBanner(true);
+      // Behavior decision: keep submission flowing. The banner + Find Support
+      // sheet is the UI safety net; server-side moderation in
+      // supabase/functions/chat-completion is the authoritative gate. Blocking
+      // here would mask the user's signal from the model (which is tuned for
+      // these messages) and break the experience for false positives.
+      if (!crisisFiredRef.current) {
+        crisisFiredRef.current = true;
+        track('crisis_detected', { message_length: messageText.length });
+      }
     }
 
     setInputText('');
+    const isFirst = messages.length <= 1;
     await addUserMessage(messageText);
-    track('chat_first_message_sent');
+    // Fires on every send; is_first distinguishes the activation moment from
+    // ongoing engagement. PostHog can split daily volume vs first-message rate.
+    track('chat_message_sent', {
+      is_first: isFirst,
+      message_length: messageText.length,
+      message_index: messages.length,
+    });
 
     try {
-      const isFirst = messages.length <= 1;
       await sendChatMessage(currentSession!.id, messageText, {
         isFirstConversation: isFirst,
         nickname: onboarding.nickname ?? undefined,

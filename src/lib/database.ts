@@ -101,6 +101,23 @@ async function runMigrations(database: SQLite.SQLiteDatabase) {
   `);
 
   await migrateOnboardingV2(database);
+  await migrateOpenerCacheV2(database);
+}
+
+async function migrateOpenerCacheV2(database: SQLite.SQLiteDatabase) {
+  const result = await database.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  const currentVersion = result?.user_version ?? 0;
+  if (currentVersion >= 2) return;
+
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS opener_cache (
+      date TEXT PRIMARY KEY,
+      opener TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'ai',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    PRAGMA user_version = 2;
+  `);
 }
 
 async function migrateOnboardingV2(database: SQLite.SQLiteDatabase) {
@@ -152,6 +169,12 @@ export async function clearAllUserData(): Promise<void> {
       mood TEXT,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS opener_cache (
+      date TEXT PRIMARY KEY,
+      opener TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'ai',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
     DELETE FROM chat_messages;
     DELETE FROM chat_sessions;
     DELETE FROM mood_entries;
@@ -159,6 +182,7 @@ export async function clearAllUserData(): Promise<void> {
     DELETE FROM breathing_sessions;
     DELETE FROM sync_queue;
     DELETE FROM daily_prompts;
+    DELETE FROM opener_cache;
     UPDATE onboarding
        SET completed_step = 0,
            selected_mood = NULL,

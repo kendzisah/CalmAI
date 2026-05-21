@@ -132,25 +132,19 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401, headers: JSON_HEADERS });
     }
 
-    // Subscription / rate limit
+    // Subscription gate. CalmAI is subscription-only. Any non-Pro caller
+    // (including trial-expired and never-subscribed) gets a 402 here.
     const { data: profile } = await supabase
       .from('users')
       .select('subscription_tier')
       .eq('id', user.id)
       .single();
 
-    if (profile?.subscription_tier === 'free') {
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      const { count } = await supabase
-        .from('chat_sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('started_at', weekAgo.toISOString());
-
-      if ((count || 0) >= 3) {
-        return new Response(JSON.stringify({ error: 'Weekly session limit reached' }), { status: 402, headers: JSON_HEADERS });
-      }
+    if (profile?.subscription_tier !== 'pro') {
+      return new Response(
+        JSON.stringify({ error: 'Active subscription required' }),
+        { status: 402, headers: JSON_HEADERS }
+      );
     }
 
     const body = await req.json();

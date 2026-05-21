@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { restoreFromCloud } from '@/services/syncService';
 import { resetLocalUserData } from '@/services/resetService';
+import { identify, reset as resetAnalytics, track, captureException } from '@/lib/analytics';
 
 // Tracks the last user ID we saw an auth event for, so we can detect when a
 // session arrives for a different account and wipe local data before that
@@ -26,10 +27,21 @@ export function useAuth() {
     const onUserAuthenticated = (uid: string, isAnon: boolean) => {
       setTimeout(async () => {
         await safePurchasesLogIn(uid);
+        // Tie AppsFlyer's anonymous events (collected during onboarding before
+        // sign-in) to this Customer User ID. AF auto-stitches retroactively.
+        // Only non-PII traits — never nickname/email.
+        identify(uid, { is_anonymous: isAnon });
         if (!isAnon) {
-          restoreFromCloud().catch((e) =>
-            console.warn('[useAuth] restoreFromCloud failed:', e?.message)
-          );
+          const restoreStart = Date.now();
+          restoreFromCloud()
+            .then(() => track('cloud_restore_succeeded', { latency_ms: Date.now() - restoreStart }))
+            .catch((e) => {
+              track('cloud_restore_failed', {
+                error: e?.message?.slice(0, 80),
+                latency_ms: Date.now() - restoreStart,
+              });
+              captureException(e, { feature: 'cloud_restore' });
+            });
         }
       }, 0);
     };
@@ -82,13 +94,45 @@ export function useAuth() {
   }, []);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        track('signin_failed_detailed', {
+          method: 'email',
+          error_code: (error as any)?.code,
+          error_message: error?.message?.slice(0, 80),
+        });
+        throw error;
+      }
+    } catch (err: any) {
+      track('signin_failed_detailed', {
+        method: 'email',
+        error_code: err?.code,
+        error_message: err?.message?.slice(0, 80),
+      });
+      throw err;
+    }
   }, []);
 
   const signUpWithEmail = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) throw error;
+    try {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        track('signin_failed_detailed', {
+          method: 'email',
+          error_code: (error as any)?.code,
+          error_message: error?.message?.slice(0, 80),
+        });
+        throw error;
+      }
+    } catch (err: any) {
+      track('signin_failed_detailed', {
+        method: 'email',
+        error_code: err?.code,
+        error_message: err?.message?.slice(0, 80),
+      });
+      throw err;
+    }
   }, []);
 
   const signInWithApple = useCallback(async () => {
@@ -100,22 +144,51 @@ export function useAuth() {
       nonce
     );
 
-    const credential = await AppleAuthentication.signInAsync({
-      requestedScopes: [
-        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-        AppleAuthentication.AppleAuthenticationScope.EMAIL,
-      ],
-      nonce: hashedNonce,
-    });
+    let credential: AppleAuthentication.AppleAuthenticationCredential;
+    try {
+      credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      });
+    } catch (err: any) {
+      track('signin_failed_detailed', {
+        method: 'apple',
+        stage: 'apple_credential',
+        error_code: err?.code,
+        error_message: err?.message?.slice(0, 80),
+      });
+      throw err;
+    }
 
     if (!credential.identityToken) throw new Error('No identity token from Apple');
 
-    const { error } = await supabase.auth.signInWithIdToken({
-      provider: 'apple',
-      token: credential.identityToken,
-      nonce,
-    });
-    if (error) throw error;
+    try {
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+        nonce,
+      });
+      if (error) {
+        track('signin_failed_detailed', {
+          method: 'apple',
+          stage: 'supabase_token_exchange',
+          error_code: (error as any)?.code,
+          error_message: error?.message?.slice(0, 80),
+        });
+        throw error;
+      }
+    } catch (err: any) {
+      track('signin_failed_detailed', {
+        method: 'apple',
+        stage: 'supabase_token_exchange',
+        error_code: err?.code,
+        error_message: err?.message?.slice(0, 80),
+      });
+      throw err;
+    }
   }, []);
 
   const signOut = useCallback(async () => {
@@ -125,6 +198,7 @@ export function useAuth() {
     // next user (whoever they are) starts on a clean device.
     await resetLocalUserData();
     await AsyncStorage.removeItem(LAST_USER_ID_KEY);
+    resetAnalytics();
     await supabase.auth.signOut();
     clearAuth();
   }, [clearAuth]);

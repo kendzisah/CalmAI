@@ -7,8 +7,7 @@ import { useOnboardingStore } from '@/stores/onboardingStore';
 import { Colors, Spacing } from '@/lib/constants';
 import { track } from '@/lib/analytics';
 import {
-  requestNotificationPermission,
-  scheduleDailyReminder,
+  registerForServerPush,
   describeTriggerForUser,
 } from '@/lib/notifications';
 
@@ -33,17 +32,16 @@ export default function NotifyScreen() {
   }, []);
 
   const handleEnable = async () => {
-    const granted = await requestNotificationPermission();
-    if (granted) {
-      try {
-        await scheduleDailyReminder({ hour, nickname, tonePref });
+    try {
+      const registered = await registerForServerPush({ hour, nickname, tonePref });
+      if (registered) {
         await setNotificationsEnabled(true);
         track('notify_granted', { hour });
-      } catch (err: any) {
-        track('notify_failed', { error: err?.message });
+      } else {
+        track('notify_denied');
       }
-    } else {
-      track('notify_denied');
+    } catch (err: any) {
+      track('notify_failed', { error: err?.message });
     }
     await leave();
   };

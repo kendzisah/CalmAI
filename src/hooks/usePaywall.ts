@@ -1,46 +1,37 @@
 import { useCallback } from 'react';
 import { router } from 'expo-router';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
-import { useChatStore } from '@/stores/chatStore';
-import { useJournalStore } from '@/stores/journalStore';
 
+// Subscription-only product. Pro tier (paid or in active trial via RevenueCat)
+// is required for chat and journal. Both guards route non-Pro callers to the
+// paywall before any send or save.
 export function usePaywall() {
-  const { tier, canChat, canJournal, shouldShowPaywall } = useSubscriptionStore();
-  const { getWeeklySessionCount } = useChatStore();
-  const { getLifetimeCount } = useJournalStore();
-
-  const refreshUsage = useCallback(async () => {
-    const weeklyCount = await getWeeklySessionCount();
-    const journalCount = await getLifetimeCount();
-    useSubscriptionStore.getState().setUsage(weeklyCount, journalCount);
-  }, [getWeeklySessionCount, getLifetimeCount]);
+  const tier = useSubscriptionStore((s) => s.tier);
+  const isPro = tier === 'pro';
 
   const guardChat = useCallback(async (): Promise<boolean> => {
-    await refreshUsage();
-    if (!canChat()) {
+    if (!isPro) {
       router.push('/paywall');
       return false;
     }
     return true;
-  }, [refreshUsage, canChat]);
+  }, [isPro]);
 
   const guardJournal = useCallback(async (): Promise<boolean> => {
-    await refreshUsage();
-    if (!canJournal()) {
+    if (!isPro) {
       router.push('/paywall');
       return false;
     }
     return true;
-  }, [refreshUsage, canJournal]);
+  }, [isPro]);
 
   return {
     tier,
-    isPro: tier === 'pro',
-    canChat: canChat(),
-    canJournal: canJournal(),
-    shouldShowPaywall: shouldShowPaywall(),
+    isPro,
+    canChat: isPro,
+    canJournal: isPro,
+    shouldShowPaywall: !isPro,
     guardChat,
     guardJournal,
-    refreshUsage,
   };
 }

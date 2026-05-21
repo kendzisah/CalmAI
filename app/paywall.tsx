@@ -28,12 +28,35 @@ function openExternal(url: string) {
   });
 }
 
+function resolveTrialDays(introPrice: unknown): number | null {
+  const intro = introPrice as
+    | { price?: number; periodUnit?: string; periodNumberOfUnits?: number }
+    | null
+    | undefined;
+  if (!intro) return null;
+  if (typeof intro.price === 'number' && intro.price > 0) return null;
+  const n = intro.periodNumberOfUnits ?? 0;
+  if (n <= 0) return null;
+  switch (intro.periodUnit) {
+    case 'DAY': return n;
+    case 'WEEK': return n * 7;
+    case 'MONTH': return n * 30;
+    case 'YEAR': return n * 365;
+    default: return null;
+  }
+}
+
 export default function PaywallScreen() {
   const [selectedPlan, setSelectedPlan] = useState<Plan>('annual');
-  const { offerings, isLoading, purchaseMonthly, purchaseAnnual, restorePurchases } = useSubscription();
+  const { offerings, isLoading, isPro, purchaseMonthly, purchaseAnnual, restorePurchases } = useSubscription();
   const { completeStep, isComplete, finish, nickname } = useOnboardingStore();
   const { saveEntry } = useJournalStore();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  // Close affordance only when the user already holds an active subscription.
+  // Non-Pro callers (onboarding funnel, lockdown redirect, churned trial)
+  // must complete or restore a purchase before they leave this screen.
+  const canDismiss = isPro;
 
   const annualPkg = offerings.annual;
   const monthlyPkg = offerings.monthly;
@@ -51,7 +74,11 @@ export default function PaywallScreen() {
 
   const selectedPkg = selectedPlan === 'annual' ? annualPkg : monthlyPkg;
   const introPrice = selectedPkg?.product.introPrice;
-  const trialDays = introPrice?.periodUnit === 'DAY' ? introPrice.periodNumberOfUnits : 3;
+  // Only treat as a free trial when the intro offer is actually free AND has a
+  // valid period — otherwise we'd lie ("Start my 3-day free trial") on plans
+  // that ship without an intro offer configured in App Store Connect.
+  const trialDays = resolveTrialDays(introPrice);
+  const hasTrial = trialDays !== null;
 
   // Soft pulsing glow on the hero circle.
   const pulse = useRef(new Animated.Value(0)).current;
@@ -67,20 +94,40 @@ export default function PaywallScreen() {
   const heroOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0.95] });
 
   useEffect(() => {
-    track('paywall_pricing_viewed');
+    track('paywall_pricing_viewed', {
+      monthly_price: monthlyNumeric,
+      monthly_currency: monthlyPkg?.product.currencyCode ?? 'USD',
+      annual_price: annualNumeric,
+      annual_currency: annualPkg?.product.currencyCode ?? 'USD',
+      has_trial: hasTrial,
+      trial_days: trialDays,
+      offering_id: monthlyPkg?.product.identifier ?? annualPkg?.product.identifier ?? null,
+    });
+    // Fire once on mount — re-firing on offering load swings would create
+    // duplicate view counts in the funnel. Offerings are typically resolved
+    // before this screen mounts (loaded in useSubscription's effect).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSelect = (plan: Plan) => {
     if (selectedPlan === plan) return;
     Haptics.selectionAsync();
     setSelectedPlan(plan);
-    track(plan === 'annual' ? 'paywall_yearly_selected' : 'paywall_monthly_selected');
+    const pkg = plan === 'annual' ? annualPkg : monthlyPkg;
+    track(plan === 'annual' ? 'paywall_yearly_selected' : 'paywall_monthly_selected', {
+      product_id: pkg?.product.identifier ?? plan,
+      price: plan === 'annual' ? annualNumeric : monthlyNumeric,
+      currency: pkg?.product.currencyCode ?? 'USD',
+    });
   };
 
   const handlePurchase = async () => {
+    const pkg = selectedPlan === 'annual' ? annualPkg : monthlyPkg;
     track('paywall_purchase_attempted', {
       plan: selectedPlan,
+      product_id: pkg?.product.identifier ?? selectedPlan,
       price: selectedPlan === 'annual' ? annualNumeric : monthlyNumeric,
+      currency: pkg?.product.currencyCode ?? 'USD',
     });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
@@ -89,7 +136,8 @@ export default function PaywallScreen() {
       } else {
         await purchaseMonthly();
       }
-      track('paywall_purchase_succeeded', { plan: selectedPlan });
+      // paywall_purchase_succeeded fires from useSubscription.purchasePackage —
+      // that's where customerInfo is available for trial-vs-paid detection.
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       playChime('paywall_success');
 
@@ -98,6 +146,8 @@ export default function PaywallScreen() {
       // into /(auth)/notify — they've been past that screen once already and
       // landing on it again from inside the tabs would feel broken.
       if (isComplete) {
+        track('paywall_pricing_completed', { plan: selectedPlan, was_trial_offer: hasTrial });
+        track('welcome_after_purchase', { is_trial: hasTrial });
         router.back();
         return;
       }
@@ -112,12 +162,22 @@ export default function PaywallScreen() {
       }
       await completeStep(13);
       await finish();
+      track('paywall_pricing_completed', { plan: selectedPlan, was_trial_offer: hasTrial });
+      track('welcome_after_purchase', { is_trial: hasTrial });
       router.replace('/(auth)/notify');
     } catch (err: any) {
       if (err?.userCancelled) {
         track('paywall_dismissed', { step: 'pricing' });
       } else {
-        track('paywall_purchase_failed', { error_code: err?.code ?? err?.message });
+        const errorCategory = err?.userCancelled ? 'user_cancelled'
+          : err?.code?.includes?.('Network') ? 'network'
+          : err?.code?.includes?.('Payment') ? 'payment'
+          : err?.code?.includes?.('Store') ? 'store'
+          : 'unknown';
+        track('paywall_purchase_failed', {
+          error_code: String(err?.code ?? err?.message ?? 'unknown').slice(0, 80),
+          error_category: errorCategory,
+        });
       }
     }
   };
@@ -133,11 +193,13 @@ export default function PaywallScreen() {
     <ThemeProvider force="light">
     <GradientBackground variant="onboarding">
       <SafeAreaView style={styles.container}>
-        <Pressable style={styles.closeButton} onPress={handleClose} hitSlop={16}>
-          <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-            <Path d="M18 6L6 18M6 6l12 12" stroke={Colors.gray} strokeWidth={2.2} strokeLinecap="round" />
-          </Svg>
-        </Pressable>
+        {canDismiss && (
+          <Pressable style={styles.closeButton} onPress={handleClose} hitSlop={16}>
+            <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+              <Path d="M18 6L6 18M6 6l12 12" stroke={Colors.gray} strokeWidth={2.2} strokeLinecap="round" />
+            </Svg>
+          </Pressable>
+        )}
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {/* Hero */}
@@ -162,19 +224,21 @@ export default function PaywallScreen() {
             </View>
           </View>
 
-          <View style={styles.eyebrowRow}>
-            <Sparkle />
-            <Text variant="label" color={Colors.primary} style={styles.eyebrow}>
-              {trialDays}-Day Free Trial
-            </Text>
-            <Sparkle />
-          </View>
+          {hasTrial && (
+            <View style={styles.eyebrowRow}>
+              <Sparkle />
+              <Text variant="label" color={Colors.primary} style={styles.eyebrow}>
+                {trialDays}-Day Free Trial
+              </Text>
+              <Sparkle />
+            </View>
+          )}
 
           <Text variant="h1" style={styles.title}>
             {nickname ? `${nickname}, you're` : "You're"} ready{'\n'}for this.
           </Text>
           <Text variant="body" color={Colors.gray} style={styles.subtitle}>
-            Start free. No charge today.
+            {hasTrial ? 'Start free. No charge today.' : 'Cancel anytime.'}
           </Text>
 
           {/* What you get */}
@@ -185,32 +249,70 @@ export default function PaywallScreen() {
             <FeatureCell icon="journal" label={`Journal &\nweekly insights`} />
           </View>
 
-          {/* Timeline */}
-          <View style={styles.timelineCard}>
-            <Text variant="label" color={Colors.gray} style={styles.timelineHeader}>
-              How the trial works
-            </Text>
-            <TimelineRow
-              icon="sparkle"
-              label="Today"
-              description="Full access. Talk as much as you want."
-              accent={Colors.primary}
-              isFirst
-            />
-            <TimelineRow
-              icon="bell"
-              label={`Day ${Math.max(trialDays - 1, 2)}`}
-              description="A quiet reminder lands so you can decide."
-              accent={Colors.lavenderLight}
-            />
-            <TimelineRow
-              icon="receipt"
-              label={`Day ${trialDays}`}
-              description="If it's working, full access continues. If not, cancel anytime."
-              accent={Colors.grayLavender}
-              isLast
-            />
-          </View>
+          {/* Timeline — only shown when an actual free trial is offered. */}
+          {hasTrial && (
+            <View style={styles.timelineCard}>
+              <Text variant="label" color={Colors.gray} style={styles.timelineHeader}>
+                How the trial works
+              </Text>
+              <TimelineRow
+                icon="sparkle"
+                label="Today"
+                description="Full access. Talk as much as you want."
+                accent={Colors.primary}
+                isFirst
+              />
+              <TimelineRow
+                icon="bell"
+                label={`Day ${Math.max(trialDays! - 1, 2)}`}
+                description="A quiet reminder lands so you can decide."
+                accent={Colors.lavenderLight}
+              />
+              <TimelineRow
+                icon="receipt"
+                label={`Day ${trialDays}`}
+                description="If it's working, full access continues. If not, cancel anytime."
+                accent={Colors.grayLavender}
+                isLast
+              />
+            </View>
+          )}
+
+          {/* Benefits — without a trial to anchor the pitch, lean harder into
+              what's actually inside. Mirrors the timelineCard styling so the
+              vertical rhythm of the page stays the same. */}
+          {!hasTrial && (
+            <View style={styles.timelineCard}>
+              <Text variant="label" color={Colors.gray} style={styles.timelineHeader}>
+                Everything inside CalmAI
+              </Text>
+              <BenefitRow
+                label="Talks as long as you need."
+                description="No sessions. No clock. Late nights count."
+              />
+              <BenefitRow
+                label="A tone that matches yours."
+                description="Soft when you're fragile, direct when you want the truth."
+              />
+              <BenefitRow
+                label="CBT, friend-style."
+                description="Reframes that actually land — no clinical labels."
+              />
+              <BenefitRow
+                label="Two-minute resets."
+                description="Guided breathing and grounding for when it spikes."
+              />
+              <BenefitRow
+                label="Patterns over time."
+                description="Mood and journal trends so you see what's shifting."
+              />
+              <BenefitRow
+                label="Private by design."
+                description="No ads, no data sales. Delete anything, anytime."
+                isLast
+              />
+            </View>
+          )}
 
           {/* Plan cards */}
           <View style={styles.plans}>
@@ -236,14 +338,22 @@ export default function PaywallScreen() {
           {/* Trust strip */}
           <View style={styles.trustStrip}>
             <TrustChip icon="check" label="Cancel anytime" />
-            <TrustChip icon="lock" label="No charge today" />
+            <TrustChip icon="lock" label={hasTrial ? 'No charge today' : 'Secure checkout'} />
           </View>
         </ScrollView>
 
         {/* Sticky footer CTA */}
         <View style={styles.footer}>
           <Button
-            title={isLoading ? 'Processing…' : `Start my ${trialDays}-day free trial`}
+            title={
+              isLoading
+                ? 'Processing…'
+                : hasTrial
+                  ? `Start my ${trialDays}-day free trial`
+                  : selectedPlan === 'annual'
+                    ? `Continue — ${annualPrice}/yr`
+                    : `Continue — ${monthlyPrice}/mo`
+            }
             onPress={handlePurchase}
             disabled={isLoading}
           />
@@ -380,6 +490,36 @@ function FeatureIcon({ name }: { name: 'chat' | 'tone' | 'bell' | 'journal' }) {
       <Path d="M5 4h11l3 3v13H5z" stroke={stroke} strokeWidth={1.7} strokeLinejoin="round" />
       <Path d="M9 9h6M9 13h6M9 17h4" stroke={stroke} strokeWidth={1.7} strokeLinecap="round" />
     </Svg>
+  );
+}
+
+function BenefitRow({
+  label,
+  description,
+  isLast,
+}: {
+  label: string;
+  description: string;
+  isLast?: boolean;
+}) {
+  return (
+    <View style={[styles.benefitRow, isLast && { paddingBottom: 0 }]}>
+      <View style={styles.benefitCheck}>
+        <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M5 12.5l4 4L19 7"
+            stroke={Colors.primary}
+            strokeWidth={2.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+      </View>
+      <View style={styles.benefitText}>
+        <Text variant="bodyMedium" color={Colors.primaryDark}>{label}</Text>
+        <Text variant="caption">{description}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -596,6 +736,27 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
     paddingBottom: Spacing.sm,
+  },
+
+  // Benefits (no-trial plans)
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  benefitCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(124, 92, 191, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  benefitText: {
+    flex: 1,
+    gap: 2,
   },
 
   // Plans

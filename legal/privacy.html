@@ -80,24 +80,6 @@
       margin: 24px 0;
     }
     .callout p { margin: 0; color: var(--ink); }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 16px 0;
-      background: var(--surface);
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1px solid var(--rule);
-    }
-    th, td {
-      text-align: left;
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--rule);
-      font-size: 14px;
-      vertical-align: top;
-    }
-    th { background: rgba(124, 92, 191, 0.06); font-weight: 600; color: var(--primary-dark); }
-    tr:last-child td { border-bottom: none; }
     .footer {
       margin-top: 56px;
       padding-top: 24px;
@@ -171,16 +153,13 @@
 
     <h2>5. Service providers we share data with</h2>
     <p>We share the minimum data needed with the following providers, each bound by a data processing agreement and acting only on our instructions:</p>
-    <table>
-      <thead><tr><th>Provider</th><th>Purpose</th><th>Data shared</th></tr></thead>
-      <tbody>
-        <tr><td>Supabase</td><td>Authentication, database, and file storage</td><td>Email, account ID, onboarding profile, chat history, journal entries, mood entries</td></tr>
-        <tr><td>OpenAI</td><td>Chat completion and content moderation</td><td>Message content, recent history, profile fields used in the system prompt</td></tr>
-        <tr><td>RevenueCat</td><td>Subscription management and entitlement checks</td><td>Anonymized user ID, subscription state, product identifiers</td></tr>
-        <tr><td>Apple App Store</td><td>Billing, payment, refunds, receipts</td><td>Handled directly by Apple under their privacy policy</td></tr>
-        <tr><td>Expo</td><td>Push notification delivery and crash reporting</td><td>Push token, device metadata, crash stack traces</td></tr>
-      </tbody>
-    </table>
+    <ul>
+      <li><strong>Supabase</strong> handles authentication, the database, and file storage. It receives your email, account ID, onboarding profile, chat history, journal entries, and mood entries.</li>
+      <li><strong>OpenAI</strong> handles chat completion and content moderation. It receives your message content, recent conversation history, and the profile fields used in the system prompt.</li>
+      <li><strong>RevenueCat</strong> manages subscriptions and entitlement checks. It receives an anonymized user ID, your subscription state, and product identifiers.</li>
+      <li><strong>Apple App Store</strong> processes billing, payment, refunds, and receipts. These are handled directly by Apple under their own privacy policy — we never see your full payment details.</li>
+      <li><strong>Expo</strong> delivers push notifications and collects crash reports. It receives your push token, device metadata, and crash stack traces.</li>
+    </ul>
     <p>We do <strong>not</strong> sell your personal information, and we do not share it with advertisers or data brokers.</p>
 
     <h2>6. Legal disclosures</h2>

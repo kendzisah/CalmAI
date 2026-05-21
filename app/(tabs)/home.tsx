@@ -13,6 +13,7 @@ import { useOnboardingStore } from '@/stores/onboardingStore';
 import { useChatStore } from '@/stores/chatStore';
 import { getGreeting } from '@/utils/dateHelpers';
 import { supabase } from '@/lib/supabase';
+import { track } from '@/lib/analytics';
 
 export default function HomeScreen() {
   const colors = useThemeColors();
@@ -89,6 +90,7 @@ export default function HomeScreen() {
                   setSelectedCheckInMood(mood);
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   await checkIn(mood, 3, undefined, 'check_in');
+                  track('mood_logged', { mood, source: 'home_check_in' });
                   setShowCheckIn(false);
                   setSelectedCheckInMood(undefined);
                   getTrendData(7);

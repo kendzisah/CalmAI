@@ -4,6 +4,7 @@ import Purchases, { PurchasesPackage, CustomerInfo } from 'react-native-purchase
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { useAuthStore } from '@/stores/authStore';
 import { isPurchasesReady } from '@/lib/purchases';
+import { track } from '@/lib/analytics';
 
 const ENTITLEMENT_ID = 'Calm AI Premium';
 
@@ -61,10 +62,29 @@ export function useSubscription() {
       Alert.alert('Not Available', 'This plan is not available right now. Please try again later.');
       return;
     }
+    const purchaseStart = Date.now();
     try {
       setIsLoading(true);
       const { customerInfo } = await Purchases.purchasePackage(pkg);
       syncTier(customerInfo);
+
+      // Trial vs paid detection for ad-network attribution. RevenueCat sets
+      // periodType to 'TRIAL' when the intro offer is active. We fire
+      // paywall_purchase_succeeded here (not at the screen) so AppsFlyer can
+      // emit af_start_trial vs af_subscribe/af_purchase with the right
+      // is_trial flag — TikTok StartTrial and Meta StartTrial are the
+      // highest-value Day-0 bid signals.
+      const entitlement = customerInfo.entitlements.active[ENTITLEMENT_ID];
+      const isTrial = entitlement?.periodType === 'TRIAL';
+      track('paywall_purchase_succeeded', {
+        plan: pkg.packageType,
+        is_trial: isTrial,
+        price: pkg.product.price,
+        currency: pkg.product.currencyCode,
+        product_id: pkg.product.identifier,
+        order_id: `${customerInfo.originalAppUserId}:${entitlement?.latestPurchaseDate ?? Date.now()}`,
+        purchase_latency_ms: Date.now() - purchaseStart,
+      });
     } catch (err: any) {
       if (!err.userCancelled) {
         Alert.alert('Purchase Failed', err.message || 'Something went wrong. Please try again.');
@@ -88,11 +108,13 @@ export function useSubscription() {
       Alert.alert('Not Available', 'Purchases are not configured on this build.');
       return;
     }
+    const purchaseStart = Date.now();
     try {
       setIsLoading(true);
       const customerInfo = await Purchases.restorePurchases();
       syncTier(customerInfo);
       const isPro = typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== 'undefined';
+      track('paywall_restore', { restored: isPro, purchase_latency_ms: Date.now() - purchaseStart });
       if (isPro) {
         Alert.alert('Restored', 'Your Pro subscription has been restored.');
       } else {

@@ -20,6 +20,7 @@ interface ChatState {
   setQuickReplies: (replies: string[]) => void;
   endSession: (moodAtEnd?: string) => Promise<void>;
   getWeeklySessionCount: () => Promise<number>;
+  getLifetimeSessionCount: () => Promise<number>;
   reset: () => void;
 }
 
@@ -252,6 +253,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const count = result?.count || 0;
     set({ weeklySessionCount: count });
     return count;
+  },
+
+  getLifetimeSessionCount: async () => {
+    const db = await getDatabase();
+    const result = await db.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM chat_sessions'
+    );
+    return result?.count || 0;
   },
 
   reset: () => {

@@ -1,17 +1,18 @@
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+import { supabase } from './supabase';
 import type { TonePref, TriggerTime } from '@/types/user';
 
-interface ScheduleParams {
-  hour: number;        // 0..23
+interface RegisterParams {
+  hour: number;        // 0..23 in the user's local timezone
   nickname: string | null;
   tonePref: TonePref | null;
 }
 
-const REMINDER_IDENTIFIER = 'calmai-daily-reminder';
-
 /**
  * Configures how notifications behave when one arrives. Without this, foreground
- * notifications on iOS are silently swallowed (the system assumes you're
+ * notifications on iOS are silently swallowed (the system assumes you are
  * already showing the relevant content). Call once at app boot.
  */
 export function configureNotificationHandler(): void {
@@ -25,21 +26,9 @@ export function configureNotificationHandler(): void {
   });
 }
 
-/**
- * Returns whether the user has granted notification permission, without
- * prompting if not. Use this on screens that need to show the current state
- * (e.g. profile toggle).
- */
 export async function getNotificationPermission(): Promise<boolean> {
   const settings = await Notifications.getPermissionsAsync();
   return settings.granted;
-}
-
-function reminderText(nickname: string | null, tone: TonePref): string {
-  const name = nickname ?? 'you';
-  if (tone === 'real') return `Hey ${name}. Checking in. What's loud right now?`;
-  if (tone === 'read_room') return `Hey ${name}. Up to you tonight.`;
-  return `Hi ${name}. No pressure. I'm here if you want to talk.`;
 }
 
 export async function requestNotificationPermission(): Promise<boolean> {
@@ -55,38 +44,99 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return result.granted;
 }
 
-export async function scheduleDailyReminder({ hour, nickname, tonePref }: ScheduleParams): Promise<void> {
-  await cancelDailyReminder();
-
-  const tone: TonePref = tonePref ?? 'gentle';
-
-  await Notifications.scheduleNotificationAsync({
-    identifier: REMINDER_IDENTIFIER,
-    content: {
-      title: 'CalmAI',
-      body: reminderText(nickname, tone),
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour,
-      minute: 0,
-    },
-  });
-}
-
-export async function cancelDailyReminder(): Promise<void> {
+function deviceTimezone(): string {
   try {
-    await Notifications.cancelScheduledNotificationAsync(REMINDER_IDENTIFIER);
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   } catch {
-    // No existing reminder to cancel — ignore.
+    return 'UTC';
   }
 }
 
+async function fetchExpoPushToken(): Promise<string | null> {
+  try {
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      Constants.easConfig?.projectId;
+    const tokenResponse = projectId
+      ? await Notifications.getExpoPushTokenAsync({ projectId })
+      : await Notifications.getExpoPushTokenAsync();
+    return tokenResponse.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Registers the device for server-driven daily push notifications.
+ *
+ * Captures the Expo push token and the device timezone, writes both onto
+ * the user's row in public.users along with the chosen hour. The Supabase
+ * cron job 'daily-openers' uses these to deliver one push per day at the
+ * user's local hour.
+ *
+ * Returns false if permission was denied or the token call failed.
+ */
+export async function registerForServerPush({ hour }: RegisterParams): Promise<boolean> {
+  const granted = await requestNotificationPermission();
+  if (!granted) return false;
+
+  // Android needs a notification channel before push will surface a banner.
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Daily check-in',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      sound: undefined,
+    });
+  }
+
+  const token = await fetchExpoPushToken();
+  if (!token) return false;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user?.id) {
+    // No authed user. The token will be persisted on next sign-in if the
+    // caller re-runs registration after auth completes.
+    return false;
+  }
+
+  const timezone = deviceTimezone();
+
+  const { error } = await supabase
+    .from('users')
+    .update({
+      expo_push_token: token,
+      timezone,
+      notification_hour: hour,
+      notifications_enabled: true,
+    })
+    .eq('id', session.user.id);
+
+  return !error;
+}
+
+/**
+ * Disables server-driven daily push for the current user. Clears the
+ * notification_hour flag and toggles notifications_enabled off. The cron
+ * job filters on notifications_enabled, so the user stops receiving pushes
+ * immediately on the next hourly tick.
+ */
+export async function unregisterFromServerPush(): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user?.id) return;
+
+  await supabase
+    .from('users')
+    .update({
+      notifications_enabled: false,
+    })
+    .eq('id', session.user.id);
+}
+
 export function describeTriggerForUser(trigger: TriggerTime | null | undefined, hour: number): string | null {
-  if (trigger === '2am_spirals') return `Suggested: ${formatHour(hour)} — when 2am spirals usually start.`;
-  if (trigger === 'pre_sleep') return `Suggested: ${formatHour(hour)} — right before you wind down.`;
-  if (trigger === 'sunday_scaries') return `Suggested: ${formatHour(hour)} — before Sunday hits.`;
-  if (trigger === 'post_argument') return `Suggested: ${formatHour(hour)} — when the day catches up.`;
+  if (trigger === '2am_spirals') return `Suggested: ${formatHour(hour)}, when 2am spirals usually start.`;
+  if (trigger === 'pre_sleep') return `Suggested: ${formatHour(hour)}, right before you wind down.`;
+  if (trigger === 'sunday_scaries') return `Suggested: ${formatHour(hour)}, before Sunday hits.`;
+  if (trigger === 'post_argument') return `Suggested: ${formatHour(hour)}, when the day catches up.`;
   return null;
 }
 

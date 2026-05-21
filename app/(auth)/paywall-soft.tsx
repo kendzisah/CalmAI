@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet, Modal, Pressable, ScrollView } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { View, StyleSheet, Modal, Pressable, ScrollView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -90,6 +90,11 @@ const BENEFITS = [
 export default function PaywallSoftScreen() {
   const { completeStep, nickname, tonePref } = useOnboardingStore();
   const [showBenefits, setShowBenefits] = useState(false);
+  // Mount timestamp + primary-tap latch let us classify the exit reason when
+  // the screen unmounts. If primary was tapped, suppress the exit event so the
+  // funnel counts the soft paywall as advanced rather than abandoned.
+  const mountedAtRef = useRef<number>(Date.now());
+  const primaryTappedRef = useRef<boolean>(false);
 
   const conversation = useMemo(
     () => CONVERSATIONS[Math.floor(Math.random() * CONVERSATIONS.length)],
@@ -98,11 +103,39 @@ export default function PaywallSoftScreen() {
   const tone: TonePref = tonePref ?? 'gentle';
   const aiMessage = conversation.ai[tone];
 
+  // Fire paywall_soft_exited on unmount unless the user tapped the primary CTA.
+  // Lets us cleanly compute "viewed but bounced" cohorts in PostHog.
+  useEffect(() => {
+    return () => {
+      if (primaryTappedRef.current) return;
+      track('paywall_soft_exited', {
+        reason: 'user_back',
+        time_on_screen_ms: Date.now() - mountedAtRef.current,
+      });
+    };
+  }, []);
+
   useEffect(() => {
     track('paywall_soft_viewed', { tone, conversation_user: conversation.user });
+    // ATT prompt timed for post-onboarding: opt-in jumps to ~50–60% after the
+    // user has invested in the funnel vs ~25% on cold start. AF was init'd
+    // with timeToWaitForATTUserAuthorization=60 so startSdk is deferred until
+    // this resolves, giving us IDFA-based attribution when granted and
+    // SKAdNetwork-only when denied.
+    if (Platform.OS !== 'ios') return;
+    (async () => {
+      try {
+        const tt = await import('expo-tracking-transparency');
+        const { status } = await tt.requestTrackingPermissionsAsync();
+        track('att_prompt_result', { status });
+      } catch (err) {
+        if (__DEV__) console.warn('[paywall-soft] ATT request failed', err);
+      }
+    })();
   }, [tone, conversation.user]);
 
   const handleStart = async () => {
+    primaryTappedRef.current = true;
     track('paywall_soft_primary_tapped', { tone, conversation_user: conversation.user });
     await completeStep(12);
     router.push('/paywall');

@@ -5,6 +5,16 @@
 import { fetch as expoFetch } from 'expo/fetch';
 import { supabase } from '@/lib/supabase';
 import { useChatStore } from '@/stores/chatStore';
+import { track, captureException } from '@/lib/analytics';
+
+function categorizeNetworkError(err: any): string {
+  const msg = String(err?.message ?? '');
+  if (err?.response?.status >= 500) return `http_${err.response.status}`;
+  if (msg.includes('Network') || msg.includes('fetch failed')) return 'network';
+  if (msg.includes('timeout') || msg.includes('Timeout')) return 'timeout';
+  if (msg.includes('Abort')) return 'aborted';
+  return 'unknown';
+}
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -32,6 +42,8 @@ export async function sendChatMessage(
   const store = useChatStore.getState();
   store.setStreaming(true);
 
+  const sendTime = Date.now();
+
   let response: Response;
   try {
     response = (await expoFetch(`${SUPABASE_URL}/functions/v1/chat-completion`, {
@@ -45,6 +57,11 @@ export async function sendChatMessage(
     })) as unknown as Response;
   } catch (err) {
     store.setStreaming(false);
+    track('chat_response_failed', {
+      error_category: categorizeNetworkError(err),
+      latency_ms: Date.now() - sendTime,
+    });
+    captureException(err, { feature: 'chat' });
     throw err;
   }
 
@@ -55,7 +72,13 @@ export async function sendChatMessage(
 
   if (!response.ok) {
     store.setStreaming(false);
-    throw new Error(`Chat API error: ${response.status}`);
+    track('chat_response_failed', {
+      error_category: `http_${response.status}`,
+      latency_ms: Date.now() - sendTime,
+    });
+    const err = new Error(`Chat API error: ${response.status}`);
+    captureException(err, { feature: 'chat' });
+    throw err;
   }
 
   const contentType = response.headers.get('Content-Type') ?? '';
@@ -63,12 +86,17 @@ export async function sendChatMessage(
   // Streaming SSE path — proxy token deltas into the store as they arrive.
   if (contentType.includes('text/event-stream')) {
     try {
-      const finalContent = await consumeSseStream(response);
+      const finalContent = await consumeSseStream(response, sendTime);
       if (finalContent) {
         fetchSmartReplies(finalContent);
       }
     } catch (err) {
       store.setStreaming(false);
+      track('chat_response_failed', {
+        error_category: categorizeNetworkError(err),
+        latency_ms: Date.now() - sendTime,
+      });
+      captureException(err, { feature: 'chat' });
       throw err;
     }
     return;
@@ -85,8 +113,14 @@ export async function sendChatMessage(
       await store.addAssistantMessage(data.content);
       fetchSmartReplies(data.content);
     }
+    track('chat_response_complete', { latency_ms: Date.now() - sendTime });
   } catch (err) {
     store.setStreaming(false);
+    track('chat_response_failed', {
+      error_category: categorizeNetworkError(err),
+      latency_ms: Date.now() - sendTime,
+    });
+    captureException(err, { feature: 'chat' });
     throw err;
   }
 }
@@ -96,7 +130,7 @@ export async function sendChatMessage(
  * and finalizes the message when the `done` event is received. Returns the
  * full assembled content (or null if the stream ended without a done event).
  */
-async function consumeSseStream(response: Response): Promise<string | null> {
+async function consumeSseStream(response: Response, sendTime: number): Promise<string | null> {
   const store = useChatStore.getState();
   const body = response.body;
   if (!body) {
@@ -110,6 +144,8 @@ async function consumeSseStream(response: Response): Promise<string | null> {
   let finalContent: string | null = null;
   let crisisContent: string | null = null;
   let streamError: string | null = null;
+  let firstTokenFired = false;
+  let tokenCount = 0;
 
   try {
     while (true) {
@@ -134,6 +170,11 @@ async function consumeSseStream(response: Response): Promise<string | null> {
           try {
             const evt = JSON.parse(raw);
             if (evt.type === 'token' && typeof evt.data === 'string') {
+              if (!firstTokenFired) {
+                firstTokenFired = true;
+                track('chat_first_token_received', { latency_ms: Date.now() - sendTime });
+              }
+              tokenCount += 1;
               store.appendStreamToken(evt.data);
             } else if (evt.type === 'done') {
               finalContent = typeof evt.content === 'string' ? evt.content : null;
@@ -165,6 +206,7 @@ async function consumeSseStream(response: Response): Promise<string | null> {
   if (crisisContent) {
     store.setStreaming(false);
     await store.addAssistantMessage(crisisContent);
+    track('chat_response_complete', { latency_ms: Date.now() - sendTime, token_count: tokenCount });
     return crisisContent;
   }
 
@@ -176,12 +218,14 @@ async function consumeSseStream(response: Response): Promise<string | null> {
   const accumulated = useChatStore.getState().streamingContent;
   if (accumulated) {
     await store.finalizeStream();
+    track('chat_response_complete', { latency_ms: Date.now() - sendTime, token_count: tokenCount });
     return finalContent ?? accumulated;
   }
 
   if (finalContent) {
     store.setStreaming(false);
     await store.addAssistantMessage(finalContent);
+    track('chat_response_complete', { latency_ms: Date.now() - sendTime, token_count: tokenCount });
     return finalContent;
   }
 
@@ -210,6 +254,44 @@ async function fetchSmartReplies(lastAssistantMessage: string) {
     }
   } catch {
     // Non-critical — silently fail
+  }
+}
+
+interface OpenerOptions {
+  nickname?: string;
+  loudCategories?: string[];
+  triggerTimes?: string[];
+  copingPrefs?: string[];
+  tonePref?: string;
+}
+
+/**
+ * Asks the chat-opener edge function for an AI-generated opener for today.
+ * Pro-only on the server. Returns null on any non-OK response, on missing
+ * auth, or on transport failure. Callers should fall back to the static
+ * opener bank when null comes back.
+ */
+export async function fetchAiOpener(options: OpenerOptions): Promise<string | null> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return null;
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/chat-opener`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(options),
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    const opener = typeof data?.opener === 'string' ? data.opener.trim() : '';
+    return opener || null;
+  } catch {
+    return null;
   }
 }
 
